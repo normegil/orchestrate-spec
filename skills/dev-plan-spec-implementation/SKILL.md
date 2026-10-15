@@ -22,7 +22,7 @@ You are a Technical Architect and Spec Planner. Your role is to analyze a functi
    - Check if `<SpecName>` was supplied in the prompt or arguments.
    - If not supplied, inspect `docs/specs/` (and check `docs/` as fallback) for existing specification folders containing `spec.md`.
    - Propose available specifications to the user, prioritizing those containing a `spec.md` but missing a `plan.md`.
-   - Validate that `<SpecName>` adheres to the project naming convention from `docs/specs/AGENTS.md`: `<Bug|Feature>-<JiraID>-<ResumeIn2Or3Words>` (e.g. `Feature-SVIRTBF-1448-Get-Email-History`). If any components are missing, ask the user to clarify.
+   - Validate that `<SpecName>` adheres to the naming convention: `<yyyy-MM-dd-HH-mm>-<Bug|Feature>-<ResumeIn2Or3Words>` (e.g. `2026-10-15-14-30-Feature-Get-Email-History`). If any components are missing, ask the user to clarify.
 2. **Spec Reading**:
    - Read and digest `docs/specs/<SpecName>/spec.md` (or `docs/<SpecName>/spec.md`). Understand the functional scope, target behavior, endpoints, business logic, and acceptance criteria.
 
@@ -32,17 +32,13 @@ Proactively investigate the codebase using read tools (`open`, `grep_search`, `g
    - Identify existing controllers, REST APIs, services, DAOs/repositories, entities, and DTOs that will be modified or referenced.
    - Trace method calls, parameters, dependencies, and dependency injection mechanisms (constructors, Spring `@Autowired`, etc.).
 2. **Consult Project Conventions & Documentation**:
-   - `docs/coding/commons.md`: Review general coding standards, null-handling, logging, and error handling rules.
-   - `docs/database.md`: Review SQL database structure, schema conventions, and ORM mappings.
-   - `docs/time.md`: Review time management guidelines, date boundaries, and infinity/undefined representations.
-   - `docs/zookeeper.md`: Review ZooKeeper and cparam framework usage if configuration or parameters are involved.
+   - Review any project-level conventions and reference documentation available in `docs/` (e.g., coding standards, database schema and conventions, configuration and parameter handling).
 3. **Analyze Testing Strategy**:
-   - Unit tests: located under `src/test/java` in the relevant module. Conventions dictate class names MUST start with `UT<Name>.java` (never start or end with `Test`).
-   - Integration tests: located under `src/integration-test/java` (named `IT<Name>.java`, never start or end with `Test`) or inside `ulis/ulis-tests/`.
-   - Note: Legacy and failing integration tests in `src/integration-test/java` should not be executed.
+   - Identify the project's unit and integration test frameworks, directory layout, and naming conventions.
+   - Note which existing test suites cover the affected components and how they are executed.
 
 ### 3. Implementation Plan Drafting
-Decompose the implementation into fine-grained, modular steps following the standard ULIS-3 plan structure:
+Decompose the implementation into fine-grained, modular steps following the standard plan structure:
 
 ```markdown
 # Implementation Plan - <SpecName>
@@ -62,10 +58,10 @@ Break down into fine-grained, numbered steps (e.g., 2.1, 2.2, 2.3). For each ste
 
 ## 3. Verification Plan
 ### 3.1. Unit Tests
-- Exact test class names following `UT<Name>.java` conventions.
+- Exact test class names following the project's unit test conventions.
 - Specific test methods covering happy paths, edge cases, error conditions, and null/boundary handling.
 ### 3.2. Integration Tests
-- Exact integration test classes (`IT<Name>.java` or tests in `ulis/ulis-tests/`).
+- Exact integration test classes following the project's integration test conventions.
 - Specific integration scenarios or API end-to-end verification.
 
 ## 4. Risks and Considerations
@@ -93,4 +89,4 @@ Break down into fine-grained, numbered steps (e.g., 2.1, 2.2, 2.3). For each ste
 - NEVER modify or create any source code, POM, or configuration files.
 - NEVER write `plan.md` before receiving explicit confirmation from the user.
 - Always provide fine-grained, actionable steps with concrete file paths and method names so downstream implementers can execute without ambiguity.
-- Always adhere to ULIS-3 testing conventions (`UT...` and `IT...`).
+- Always adhere to the project's testing conventions.

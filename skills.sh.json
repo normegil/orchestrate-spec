@@ -1,0 +1,17 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Spec-driven development",
+      "description": "Analyze, plan, implement, and document features driven by a specification.",
+      "skills": [
+        "dev-orchestrate-spec",
+        "dev-analyze",
+        "dev-plan-spec-implementation",
+        "dev-implement-spec",
+        "dev-document-spec"
+      ]
+    }
+  ]
+}

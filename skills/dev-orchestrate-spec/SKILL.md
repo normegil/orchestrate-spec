@@ -51,7 +51,7 @@ graph TD
   1. Solicit the initial task description or read the file specified by the user.
   2. Ask targeted questions to clarify scope, expected behavior, and edge cases.
   3. Search the codebase and documentation (strictly read-only) to understand existing patterns and context.
-  4. Propose and validate the specification name: `<SpecName>` following project naming rules (e.g., `<Bug|Feature>-<ResumeIn2Or3Words>`).
+  4. Propose and validate the specification name: `<SpecName>` following project naming rules (e.g., `<yyyy-MM-dd-HH-mm>-<Bug|Feature>-<ResumeIn2Or3Words>`).
   5. Present the draft specification in conversation for user review.
   6. Upon explicit user confirmation, write `docs/specs/<SpecName>/spec.md`.
 - **Quality Gate & State Propagation**:
