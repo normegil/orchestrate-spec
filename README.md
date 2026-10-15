@@ -28,23 +28,6 @@ Each phase can also be invoked individually with its own skill — see [The skil
 
 `dev-orchestrate-spec` coordinates four specialized skills as a single pipeline. Every skill reads and writes under `docs/specs/<SpecName>/`, and the specification name is locked at the start and passed from phase to phase.
 
-```mermaid
-graph TD
-    User([User Prompt / Task]) --> P1[dev-analyze]
-    P1 -->|spec.md| P2[dev-plan-spec-implementation]
-    P2 -->|User approval, plan.md| P3[dev-implement-spec]
-
-    subgraph Iterate (max 5 rounds)
-        P3 --> Exec[executor]
-        Exec --> TestGen[test-generator]
-        TestGen --> Rev[reviewer]
-        Rev -->|CHANGES_REQUIRED| Exec
-    end
-
-    Rev -->|APPROVED, review.md| P4[dev-document-spec]
-    P4 --> Done([Documented, reviewed delivery])
-```
-
 Human validation gates are enforced: `spec.md` (phase 1) and `plan.md` (phase 2) are never written without your explicit approval. The implementation loop is automated and runs at most 5 iterations before escalating to you; it also stops and asks for guidance if the same review remarks repeat without progress.
 
 ### Artifacts
