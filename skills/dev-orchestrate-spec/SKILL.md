@@ -137,6 +137,10 @@ graph TD
 
 ---
 
+### End of process
+
+At the end of process, generate a commit message for the user but don't commit anything. User will review the changes before anything can be commited.
+
 ## Operating Principles & Safety Guardrails
 1. **Interactive Validation Gates**: Never skip user confirmation for `spec.md` (Phase 1) or `plan.md` (Phase 2). Automated execution begins only once the architecture is agreed upon.
 2. **Immutable Identifier**: `<SpecName>` established in Phase 1 must remain consistent across all phases and directory paths.
