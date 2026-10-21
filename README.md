@@ -51,7 +51,7 @@ docs/specs/<SpecName>/
 | `dev-orchestrate-spec` | Orchestrates the full pipeline end to end | — |
 | `dev-analyze` | Clarifies requirements interactively, identifies edge cases, proposes alternatives. Read-only except for the spec file | `docs/specs/<SpecName>/spec.md` |
 | `dev-plan-spec-implementation` | Researches the codebase read-only, drafts fine-grained actionable steps with a verification plan | `docs/specs/<SpecName>/plan.md` |
-| `dev-implement-spec` | Runs the iterative implement / test / review loop across executor, test-generator, a parallel reviewer panel, and review-synthesizer (bundled in `skills/dev-implement-spec/agents/`) | code, tests, `docs/specs/<SpecName>/reviews/`, `docs/specs/<SpecName>/review.md` |
+| `dev-implement-spec` | Runs the iterative implement / test / review loop across executor (with optional fan-out to bounded sub-implementers), test-generator (single global QA pass), a parallel reviewer panel, and review-synthesizer (bundled in `skills/dev-implement-spec/agents/`) | code, tests, `docs/specs/<SpecName>/reviews/`, `docs/specs/<SpecName>/review.md` |
 | `dev-document-spec` | After approval: enriches in-code docs (public APIs, complex logic, gotchas) and updates project `README.md` and `docs/` | docs, comments |
 
 ### Using a phase individually
@@ -69,7 +69,7 @@ If `<SpecName>` is omitted, the skill scans `docs/specs/` for specifications tha
 
 ## Guardrails
 
-- **Role separation** — the analyst and planner never touch code; all reviewers and the synthesizer operate read-only on project code; the executor and test-generator do not alter architecture without review.
+- **Role separation** — the analyst and planner never touch code; all reviewers and the synthesizer operate read-only on project code; the executor, sub-implementers (bound by the executor's constraints), and test-generator do not alter architecture without review.
 - **Confirmation gates** — no `spec.md` or `plan.md` is written without explicit user validation.
 - **Bounded automation** — the implementation loop caps at 5 iterations and escalates to the user if changes remain unapproved at the end of iteration 5.
 - **Escalation** — unresolved questions, build errors, or review failures unapproved after 5 iterations pause the pipeline and surface actionable context to you.

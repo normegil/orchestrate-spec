@@ -29,9 +29,9 @@ Initialize `iteration = 1` (default maximum iterations = 5).
 For each iteration:
 
 1. **Step A: Code Implementation & Compilation (Prompt: `./agents/executor.md`)**
-   - Iteration 1: Delegate to `executor` to implement Section 2 of `plan.md`.
-   - Subsequent Iterations: Delegate to `executor` with action items from `review.md`.
-   - The `executor` implements code, verifies compilation, and ensures existing tests pass.
+   - Iteration 1: Delegate to `executor` to implement Section 2 of `plan.md`, fanning out to bounded sub-implementers under its Parallelization Rules when tasks are provably independent.
+   - Subsequent Iterations: Delegate to `executor` with action items from `review.md` (fanning out to bounded sub-implementers when action items are file-disjoint).
+   - The `executor` coordinates implementation, runs integration builds and test suites, and ensures all changes compile cleanly and pass tests. (Sub-implementer fan-out is internal to the executor; the orchestrator never spawns sub-implementers directly).
 
 2. **Step B: Test Generation & Execution (Prompt: `./agents/test-generator.md`)**
    - Iteration 1: Delegate to `test-generator` to create Unit/Integration tests from Section 3 of `plan.md`.
@@ -66,7 +66,7 @@ For each iteration:
 ### 3. Monitoring, Safeguards & User Interaction
 1. **Iteration Limit & Escalation**: At most **5 iterations**. If iteration 5 finishes with `CHANGES_REQUIRED` (or unresolved stagnation across iterations), pause and escalate to the user with blocking context and stagnation history.
 2. **Stagnation Detection**: `merge-findings.py` tracks repeating finding signatures (`file + category + severity`) across consecutive cycles to inform the executor and test-generator. Stagnation is reported in intermediate reviews but does not escalate to the user before the completion of 5 iterations.
-3. **Transparency**: Post concise progress updates before each step (announcing active reviewers, skipped roles, and invented domains).
+3. **Transparency**: Post concise progress updates before each step (announcing active reviewers, skipped roles, invented domains, and executor sub-implementer fan-out with IDs and scopes).
 
 ### 4. Completion Deliverables
 When the loop finishes successfully:
