@@ -27,6 +27,8 @@ Model specifications as a **design tree** where decisions branch into dependent 
 - **Scaling**: Scope the tree to the change: small tree for trivial bugfixes, full grilling for large features.
 - **Termination**: Grilling ends when the frontier is empty (all branches resolved, no hidden assumptions).
 
+Use the "ask" tool for the questions.
+
 ### 3. Specification Recording & Validation Gate
 When the frontier is empty:
 1. Propose `<SpecName>` following `<yyyy-MM-dd-HH-mm>-<Bug|Feature>-<ResumeIn2Or3Words>` (e.g., `2026-10-15-14-30-Feature-User-Management`).
