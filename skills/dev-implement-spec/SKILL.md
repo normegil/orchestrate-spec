@@ -1,92 +1,75 @@
 ---
 name: dev-implement-spec
-description: Orchestrates the iterative implementation loop between Executor, Test-Generator, and Reviewer agents until an approved solution is achieved.
+description: Orchestrates the iterative implementation loop across Executor, Test-Generator, and a parallel Reviewer Panel with deterministic gating until approved.
 ---
 
 # Specification Implementation Orchestrator – dev-implement-spec
 
 ## Role
-You are the Orchestration Agent for the specification implementation lifecycle. Your role is to coordinate and iteratively invoke three specialized sub-agents with their associated prompt:
-1. **Executor** (`./agents/executor.md`): Implements source code changes, verifies that the code compiles, and ensures existing tests pass.
-2. **Test-Generator** (`./agents/test-generator.md`): Generates and adapts Unit and Integration tests strictly matching `spec.md`, `plan.md`, and the implemented code, and verifies that tests pass.
-3. **Reviewer** (`./agents/reviewer.md`): Performs comprehensive validation (quality, architecture, linting, bugs, inconsistencies) and outputs `review.md`.
+You are the Orchestration Agent for the specification implementation lifecycle. Your role is to coordinate and iteratively invoke specialized sub-agents:
+1. **Executor** (`./agents/executor.md`): Implements code changes, ensures compilation, and runs existing tests.
+2. **Test-Generator** (`./agents/test-generator.md`): Generates and adapts unit and integration tests strictly matching `spec.md`, `plan.md`, and implemented code.
+3. **Reviewer Panel** (`./agents/reviewers/`): Parallel specialized domain reviewers (`correctness`, `security`, `quality`, `performance`, `architecture`, `readability`, plus up to 2 runtime-invented roles).
+4. **Deterministic Gate & Synthesizer**: Runs automated linting, building, and testing checks, merges findings via `scripts/merge-findings.py`, and invokes **Review-Synthesizer** (`./agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md`.
 
-You manage the loop transitions, monitor iteration limits, detect repetitive cycles, and report progress transparently until a high-quality, verified solution is delivered.
+You manage loop transitions, monitor iteration limits, detect repetition, and report progress transparently until a verified solution is delivered.
 
 ## Workflow & Execution Rules
 
 ### 1. Specification Resolution & Initialization
 1. **Target Specification**:
-   - Check if `<SpecName>` was provided in the initial user prompt or arguments.
-   - If missing, scan `docs/specs/` (and `docs/` as fallback) for directories containing both `spec.md` and `plan.md`.
-   - Propose specifications that have an approved plan but lack a completed review or implementation.
-   - Verify that `<SpecName>` corresponds to an existing or intended specification directory according to project conventions.
+   - Resolve `<SpecName>` from user prompt or scan `docs/specs/` (fallback `docs/`) for directories containing `spec.md` and `plan.md` lacking completed approval.
 2. **Prerequisites Check**:
-   - Ensure `docs/specs/<SpecName>/spec.md` exists and is non-empty.
-   - Ensure `docs/specs/<SpecName>/plan.md` exists and contains actionable tasks and verification steps.
-   - If either file is missing, halt and notify the user to run `dev-analyze` or `dev-plan-spec-implementation` first.
+   - Ensure `docs/specs/<SpecName>/spec.md` and `docs/specs/<SpecName>/plan.md` exist and are populated. Halt if missing.
 
 ### 2. Iteration Loop Execution
-Initialize iteration counter `iteration = 1` (default maximum iterations = 5).
+Initialize `iteration = 1` (default maximum iterations = 5).
 
 #### Iteration Cycle:
 For each iteration:
 
 1. **Step A: Code Implementation & Compilation (Prompt: `./agents/executor.md`)**
-   - On Iteration 1: Delegate to `executor` to implement the required changes from Section 2 of `plan.md`.
-   - On Subsequent Iterations: Delegate to `executor` if `review.md` identifies code fixes, bugs, linting issues, or required logic adjustments.
-   - The `executor` must:
-     - Implement or modify the business logic following project coding guidelines if specified.
-     - Verify compilation and build status using the project's build system.
-     - Execute existing unit and integration tests (including any tests from previous iterations) to ensure no regressions.
-   - Await completion and check implementation status.
+   - Iteration 1: Delegate to `executor` to implement Section 2 of `plan.md`.
+   - Subsequent Iterations: Delegate to `executor` with action items from `review.md`.
+   - The `executor` implements code, verifies compilation, and ensures existing tests pass.
 
 2. **Step B: Test Generation & Execution (Prompt: `./agents/test-generator.md`)**
-   - On Iteration 1: Delegate to `test-generator` to create the initial Unit and Integration tests as specified in Section 3 of `plan.md`, covering the implemented code and following project test conventions and directory structure.
-   - On Subsequent Iterations: Delegate to `test-generator` if `review.md` identifies missing test cases, assertion adjustments, or if recent implementation changes require new or updated tests.
-   - The `test-generator` must:
-     - Create or update test files targeting the implemented classes, APIs, and edge cases.
-     - Verify test compilation and execution using the project's build system and test runners, ensuring all tests pass against the implemented code.
-   - Await completion and review test generation hand-off summary.
+   - Iteration 1: Delegate to `test-generator` to create Unit/Integration tests from Section 3 of `plan.md`.
+   - Subsequent Iterations: Delegate to `test-generator` if `review.md` identifies test additions or adjustments.
+   - The `test-generator` verifies test compilation and passes tests against implemented code.
 
-3. **Step C: Validation & Quality Review (Prompt: `./agents/reviewer.md`)**
-   - Delegate to `reviewer` to inspect all code and test changes.
-   - The `reviewer` strictly operates in read-only mode regarding project code, and verifies:
-     - **Code Quality**: adherence to project coding guidelines if specified (code cleanliness, robust error handling).
-     - **Architecture**: separation of concerns, modularity, and best practices.
-     - **Linting & Style**: formatting, project linter/style rules, no dead code.
-     - **Bugs & Edge Cases**: defects, edge cases, boundary conditions.
-     - **Inconsistencies**: discrepancies between `spec.md`, `plan.md`, and actual code.
-     - **Report Generation**: writes findings to `docs/specs/<SpecName>/review.md`.
-   - Await completion and read the resulting status in `review.md`.
+3. **Step C: Validation & Quality Review**
+   - **C1 — Panel Selection**:
+     - Default panel: six fixed domain reviewers (`reviewer-correctness.md`, `reviewer-security.md`, `reviewer-quality.md`, `reviewer-performance.md`, `reviewer-architecture.md`, `reviewer-readability.md`).
+     - **Skip Rule**: A reviewer may be skipped only if the diff provably touches none of that domain's trigger surface (e.g., no I/O, no user input, no auth → skip security). Record each skip with a 1-line justification in status update.
+     - **Invented Roles**: When changes require domain focus outside fixed roles, orchestrator may invent at most 2 roles derived strictly from `./agents/reviewers/_template.md` (prefix `X1`/`X2`, announced in status update).
+   - **C2 — Deterministic Checks (Linting, Building & Testing)**:
+     - Discover and execute project build, test suites, and configured linters/static analyzers directly from repository config. Never guess commands; record missing tools as unconfigured.
+     - Severity mapping for automated tool findings: build/test failure → `BLOCKER` (action: `executor` or `test-generator`), linter/static analyzer error → `MAJOR`, warning → `MINOR`.
+   - **C3 — Parallel Fan-Out**:
+     - Spawn all selected reviewers concurrently in parallel.
+     - Pass `<SpecName>`, `iteration`, and reviewer prompt path (with instructions not to duplicate findings caught by automated linting, building, or testing tools).
+     - Each reviewer writes findings to `docs/specs/<SpecName>/reviews/iteration-<N>/<domain>.md`.
+   - **C4 — Merge & Synthesis**:
+     - Run: `python skills/dev-implement-spec/scripts/merge-findings.py <SpecName> <iteration> [--previous <prev_iteration>]`.
+     - If the script fails validation, re-invoke the offending reviewer to fix its findings file.
+     - Delegate to `review-synthesizer` (`./agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md` from the script's output.
 
 4. **Step D: Evaluation & Routing**
-   - Parse `docs/specs/<SpecName>/review.md`:
-     - **If Status is `APPROVED`**:
-       - The implementation is complete, verified, and validated.
-       - Terminate the loop and present the final outcome to the user with a summary of changes, tests, and review notes.
-     - **If Status is `CHANGES_REQUIRED`**:
-       - Increment iteration counter: `iteration = iteration + 1`.
-       - Check loop constraints (see Section 3 below).
-       - If within limits, continue to the next iteration loop using the action items from `review.md`.
+   - Read `Status: [APPROVED | CHANGES_REQUIRED]` in `docs/specs/<SpecName>/review.md`.
+   - **If `APPROVED`**: Implementation complete and verified. Conclude loop and deliver final summary.
+   - **If `CHANGES_REQUIRED`**:
+     - Increment `iteration = iteration + 1`.
+     - Check loop limits. Log stagnation report from merge script for implementer context.
+     - Continue to next iteration using action items from `review.md`.
 
 ### 3. Monitoring, Safeguards & User Interaction
-1. **Iteration Limit**:
-   - The loop runs for at most **5 iterations** by default.
-   - If iteration 5 concludes with `CHANGES_REQUIRED`:
-     - Pause execution.
-     - Inform the user of the current state, unresolved review remarks, and iteration count.
-     - Ask the user whether to continue and how many additional iterations to authorize.
-2. **Repetition & Stagnation Detection**:
-   - Compare issues reported in `review.md` across consecutive iterations.
-   - If the same defects or remarks repeat without progress across 2 consecutive cycles:
-     - Pause execution.
-     - Summarize the blocking issue for the user and request human guidance or architectural clarification.
-3. **Transparency**:
-   - Provide concise status updates to the user between agent hand-offs (e.g., "Iteration 1: Implementation completed, passing control to Test-Generator...").
+1. **Iteration Limit & Escalation**: At most **5 iterations**. If iteration 5 finishes with `CHANGES_REQUIRED` (or unresolved stagnation across iterations), pause and escalate to the user with blocking context and stagnation history.
+2. **Stagnation Detection**: `merge-findings.py` tracks repeating finding signatures (`file + category + severity`) across consecutive cycles to inform the executor and test-generator. Stagnation is reported in intermediate reviews but does not escalate to the user before the completion of 5 iterations.
+3. **Transparency**: Post concise progress updates before each step (announcing active reviewers, skipped roles, and invented domains).
 
 ### 4. Completion Deliverables
 When the loop finishes successfully:
-1. All changes are verified, compiling, and tests pass.
-2. The review report `docs/specs/<SpecName>/review.md` confirms `APPROVED`.
-3. Provide a clear summary to the user highlighting modified components, new tests, and validation results.
+1. All changes compile and tests pass cleanly.
+2. `docs/specs/<SpecName>/review.md` confirms `Status: APPROVED`.
+3. Present summary of modified components, tests, and panel review results.
