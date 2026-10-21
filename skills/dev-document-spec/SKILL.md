@@ -19,14 +19,14 @@ Technical Writer and Documentation Agent for post-implementation lifecycle. Runs
 ### 1. Context Gathering & Spec Resolution
 1. **Resolve `<SpecName>` deterministically**:
    - Use input `<SpecName>` if provided.
-   - Else scan `docs/specs/` (or `docs/`) for `review.md` with explicit approved verdict (line matching `Status|Verdict: APPROVED`).
+   - Else scan `docs/specs/` (or `docs/`) for `review.md` with an explicit approved verdict: a line matching the canonical regex `^[[:space:]]*#*[[:space:]]*[-*]?[[:space:]]*(Status|Verdict)[[:space:]]*:[[:space:]]*APPROVED[[:space:]]*$` (case-insensitive; accepts the markdown heading form `## Status: APPROVED` and list form `- Verdict: APPROVED`). This regex is defined once in `<skill_dir>/scripts/gather-context.sh` (`APPROVED_REGEX`), which is the single source of truth — never use a looser or stricter match. A bare `APPROVED` line does not count.
    - If multiple match, choose latest by name/timestamp. If none match, fail explicitly.
    - *(Optional helper: run `<skill_dir>/scripts/gather-context.sh [<SpecName>]`)*.
 2. **Process Artifacts**: Read available artifacts (`spec.md`, `plan.md`, `review.md`). If any artifact is missing, skip it, note in summary, and rely on code diff as source of truth.
 3. **Inspect Code Changes & Scope Filter**:
    - In git repos: inspect diff from baseline (`git merge-base HEAD main/master`, commit of `review.md`, or `HEAD~1`).
    - Exclude vendor, build outputs, lockfiles, and generated files (`vendor/`, `dist/`, `node_modules/`, `*.lock`, `*_generated.*`).
-   - If diff exceeds ~40 files: prioritize files listed in `plan.md` and flag truncation in summary.
+   - If the diff is large (more than ~40 in-scope files): list all in-scope files and flag the diff size in the summary. Never silently truncate the file list.
    - Non-git fallback: inspect changed files manually and note lack of git history.
    - Track added, modified, renamed, and removed components.
 

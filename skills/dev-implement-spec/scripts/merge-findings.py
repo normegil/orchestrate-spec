@@ -5,7 +5,9 @@ and stagnation reporting for the dev-implement-spec review panel.
 
 Standard library only. Python 3 compatible.
 Usage:
-    python merge-findings.py <SpecName> <iteration> [--previous <iteration_or_tag>]
+    python3 merge-findings.py <SpecName> <iteration> [--previous <iteration_or_tag>]
+
+From iteration 2 onward, --previous defaults to <iteration - 1>.
 """
 
 import sys
@@ -228,8 +230,12 @@ def parse_line_range(line_str):
 
 def deduplicate_findings(findings):
     """
-    Deduplicates findings based on same file, overlapping line range, and same category.
-    Keeps the highest severity.
+    Deduplicates findings based on same file, same category, and actually
+    overlapping line ranges. Keeps the highest severity.
+
+    A finding without line information never overlaps: distinct defects in
+    the same file and category must survive (e.g. two MAJOR security issues,
+    one with a line number and one without).
     """
     merged = []
     discarded = []
@@ -245,17 +251,10 @@ def deduplicate_findings(findings):
             ext_cat = existing["category"].strip().lower()
             if item_file and item_file == ext_file and item_cat and item_cat == ext_cat:
                 ext_lines = parse_line_range(existing["line"])
-                # Check line overlap or both have no lines
-                overlap = False
-                if item_lines and ext_lines:
-                    if not item_lines.isdisjoint(ext_lines):
-                        overlap = True
-                elif not item_lines and not ext_lines:
-                    overlap = True
-                elif not item_lines or not ext_lines:
-                    # One has no lines, but same file & category
-                    overlap = True
-                
+                # Merge only when both line ranges exist and actually overlap.
+                # "No line" never overlaps.
+                overlap = bool(item_lines) and bool(ext_lines) and not item_lines.isdisjoint(ext_lines)
+
                 if overlap:
                     dup_idx = i
                     break
@@ -297,7 +296,7 @@ def main():
     parser = argparse.ArgumentParser(description="Merge and gate review findings.")
     parser.add_argument("spec_name", help="Specification name (directory name under docs/specs/)")
     parser.add_argument("iteration", help="Iteration number or tag (e.g. 1, iteration-1)")
-    parser.add_argument("--previous", help="Previous iteration number or tag to detect stagnation (e.g. 1, iteration-1)")
+    parser.add_argument("--previous", help="Previous iteration number or tag to detect stagnation (e.g. 1, iteration-1). Defaults to <iteration - 1> from iteration 2 onward.")
     args = parser.parse_args()
 
     spec_dir = find_spec_dir(args.spec_name)
@@ -366,10 +365,15 @@ def main():
     executor_actions = [f for f in merged_findings if f["action_for"] == "executor"]
     testgen_actions = [f for f in merged_findings if f["action_for"] == "test-generator"]
 
-    # Check stagnation if previous iteration provided
+    # Check stagnation. From iteration 2 onward, always compare against the
+    # previous iteration (--previous defaults to iteration - 1).
+    prev_tag = args.previous
+    if prev_tag is None and iter_num >= 2:
+        prev_tag = str(iter_num - 1)
+
     stagnant_findings = []
-    if args.previous:
-        prev_iter_num = parse_iteration_number(args.previous)
+    if prev_tag:
+        prev_iter_num = parse_iteration_number(prev_tag)
         prev_iter_dir = spec_dir / "reviews" / f"iteration-{prev_iter_num}"
         if prev_iter_dir.is_dir():
             prev_all_findings = []
@@ -379,6 +383,8 @@ def main():
                     prev_all_findings.extend(p_finds)
             prev_merged, _ = deduplicate_findings(prev_all_findings)
             stagnant_findings = check_stagnation(merged_findings, prev_merged)
+        else:
+            sys.stderr.write(f"WARNING: Stagnation analysis skipped: previous iteration directory not found: {prev_iter_dir}\n")
 
     # Output formatting to stdout
     print(f"# Review Merge Report - {args.spec_name}")
@@ -412,15 +418,25 @@ def main():
             print(f"- Finding {d['id']} ({d['severity']}) on `{d['file']}:{d['line']}` ({d['category']}): {reason}")
         print()
 
-    if args.previous:
+    if prev_tag:
         print("## Stagnation Report")
         if stagnant_findings:
-            print(f"WARNING: {len(stagnant_findings)} repeating findings detected across iteration {args.previous} and {iter_num}:")
+            print(f"WARNING: {len(stagnant_findings)} repeating findings detected across iteration {prev_tag} and {iter_num}:")
             for curr_f, prev_f in stagnant_findings:
                 print(f"- Repeating {curr_f['severity']} [{curr_f['category']}] on `{curr_f['file']}:{curr_f['line']}` (Current ID: {curr_f['id']}, Prev ID: {prev_f['id']})")
         else:
             print("No stagnant findings detected from previous iteration.")
         print()
+
+    print("## Unresolved MINORs")
+    minor_findings = [f for f in merged_findings if f["severity"] == "MINOR"]
+    if minor_findings:
+        print("MINOR findings do not block approval and must be recorded here so they remain visible across iterations:")
+        for f in minor_findings:
+            print(f"- {f['id']}: `{f['file']}:{f['line']}` ({f['category']}) - {f['description']}")
+    else:
+        print("- No unresolved MINOR findings.")
+    print()
 
     print("## Action Items & Next Steps")
     print("### Executor Tasks")

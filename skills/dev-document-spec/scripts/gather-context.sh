@@ -4,6 +4,12 @@ set -euo pipefail
 
 SPEC_NAME="${1:-}"
 
+# Canonical approved-verdict detector (single source of truth, shared with
+# dev-document-spec SKILL.md): a case-insensitive line 'Status: APPROVED' or
+# 'Verdict: APPROVED', optionally as a markdown heading ('## Status: APPROVED')
+# or list item ('- Verdict: APPROVED'). A bare 'APPROVED' line does NOT match.
+APPROVED_REGEX='^[[:space:]]*#*[[:space:]]*[-*]?[[:space:]]*(Status|Verdict)[[:space:]]*:[[:space:]]*APPROVED[[:space:]]*$'
+
 # 1. Resolve SpecName deterministically
 if [ -z "$SPEC_NAME" ]; then
     # Look for directories in docs/specs or docs
@@ -15,7 +21,7 @@ if [ -z "$SPEC_NAME" ]; then
             for spec_dir in "$dir"/*; do
                 if [ -d "$spec_dir" ]; then
                     rev_file="$spec_dir/review.md"
-                    if [ -f "$rev_file" ] && grep -qE '^[[:space:]]*-?[[:space:]]*(Verdict|Status|Decision)?[[:space:]]*:?[[:space:]]*APPROVED[[:space:]]*$' -i "$rev_file"; then
+                    if [ -f "$rev_file" ] && grep -qE "$APPROVED_REGEX" -i "$rev_file"; then
                         FOUND_SPECS+=("$(basename "$spec_dir")")
                     fi
                 fi
@@ -76,11 +82,9 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     FILE_COUNT=$(echo "$FILTERED_CHANGED" | grep -c . || true)
     echo "Changed/Added files ($FILE_COUNT in scope):"
     if [ "$FILE_COUNT" -gt 40 ]; then
-        echo "WARNING: Diff exceeds 40 files ($FILE_COUNT files). Prioritizing first 40 files / files in plan.md (truncation flagged)."
-        echo "$FILTERED_CHANGED" | head -n 40
-    else
-        echo "$FILTERED_CHANGED"
+        echo "WARNING: Large diff ($FILE_COUNT in-scope files). All files are listed; flag the diff size in the summary."
     fi
+    echo "$FILTERED_CHANGED"
 
     echo "Removed/Renamed files:"
     git diff --name-only --diff-filter=DR "$BASE_REF" 2>/dev/null | grep -vE "$EXCLUDE_REGEX" || true

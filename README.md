@@ -21,8 +21,8 @@ The main entry point is the orchestrator skill:
 
 - `<MySpec>`: Describe a task in conversation; starts Phase 1 requirements grilling.
 - `<LinkToRequirementsFile>`: Point to a requirements file; starts Phase 1 from loaded content.
-- `<SpecName>`: 
-  - Describe a task in conversation; starts Phase 1 requirements grilling OR 
+- `<SpecName>`: Can be one of 2 things, depending on the presence of expected files:
+  - Describe a task in conversation; starts Phase 1 requirements grilling.
   - Resume an existing specification pipeline from its detected phase.
 
 Each phase can also run standalone — see [The skills](#the-skills).
@@ -82,8 +82,8 @@ If `<SpecName>` is omitted, the skill scans `docs/specs/` and proposes matching 
 
 ## Citations & Acknowledgments
 
-The interactive grilling procedure is adapted from Matt Pocock's [grilling skill](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling).
+The interactive grilling procedure is adapted from Matt Pocock's [grilling skill](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling), which is licensed under the [MIT License](https://spdx.org/licenses/MIT.html) (GPL-3.0-compatible). The upstream notice is reproduced in [NOTICE](NOTICE).
 
 ## License
 
-[GPL-3.0-or-later](https://spdx.org/licenses/GPL-3.0-or-later.html)
+[GPL-3.0-or-later](https://spdx.org/licenses/GPL-3.0-or-later.html) — see [LICENSE](LICENSE) and [NOTICE](NOTICE).

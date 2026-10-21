@@ -59,6 +59,6 @@ files_reviewed:
   - `MAJOR`: Should fix before approval (design flaw, missing planned test scenario, contract break).
   - `MINOR`: Optional improvement.
   - `INFO`: Neutral observation.
-- **ID Prefix**: Use `X1-<n>` or `X2-<n>` (unique sequential integers).
+- **ID Prefix**: Use the prefix assigned in your invocation prompt — the first invented role uses `X1-<n>`, the second uses `X2-<n>` (unique sequential integers). Never pick a prefix yourself.
 - **Action for**: Exactly one of `executor`, `test-generator`, `none`.
 - **Empty Findings**: If zero findings, output single row `| – | – | – | – | – | No findings | none | – |`, 0 blockers, 0 majors, and declare unverified areas in remarks.

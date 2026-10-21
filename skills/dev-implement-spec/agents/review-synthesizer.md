@@ -16,9 +16,11 @@ Execute `<skill_dir>/scripts/merge-findings.py`, validate results, and transcrib
 ## Synthesis Workflow
 1. **Execute Merge Script**:
    ```bash
-   python <skill_dir>/scripts/merge-findings.py <SpecName> <iteration> [--previous <prev_iteration>]
+   python3 <skill_dir>/scripts/merge-findings.py <SpecName> <iteration> [--previous <prev_iteration>]
    ```
-2. **Generate Report**: Write `docs/specs/<SpecName>/review.md` using the template below.
+   - From iteration 2 onward, ALWAYS pass `--previous <iteration - 1>` (the script also defaults to it, but pass it explicitly). Iteration 1 has no previous iteration.
+2. **Build AC Coverage Matrix**: Transcribe the `AC-n` → test mapping from the test-generator's latest hand-off summary (actual executed mapping). If unavailable, fall back to Section 3 of `plan.md` (planned mapping) and label the matrix "planned, not verified". Building this matrix is transcription of existing material, not gate re-evaluation — the gate status remains verbatim from the script.
+3. **Generate Report**: Write `docs/specs/<SpecName>/review.md` using the template below.
 
 ## Output Format (`docs/specs/<SpecName>/review.md`)
 
@@ -45,10 +47,19 @@ Date: <timestamp>
 |---|---|---|---|---|---|---|---|
 <!-- Merged table from merge-findings.py output -->
 
-## 4. Stagnation Analysis
-<!-- Stagnation report from script (or 'No stagnant findings detected') -->
+## 4. AC Coverage Matrix
+| Acceptance Criterion | Test(s) | Status |
+|---|---|---|
+| AC-1 | <test file::test name> | covered |
+<!-- Every AC-n from spec.md must appear. Transcribe from test-generator hand-off summary, or plan.md Section 3 labeled "planned, not verified". -->
 
-## 5. Action Items & Next Steps
+## 5. Stagnation Analysis
+<!-- Stagnation report from script, or 'No stagnant findings detected'. Absent on iteration 1. -->
+
+## 6. Unresolved MINORs
+<!-- Transcribe verbatim from the script's 'Unresolved MINORs' section. MINORs never block approval but MUST be listed here so they remain visible across iterations. If none: 'No unresolved MINOR findings.' -->
+
+## 7. Action Items & Next Steps
 ### Executor Tasks
 <!-- Action items for Executor from script output -->
 

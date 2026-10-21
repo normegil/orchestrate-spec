@@ -39,8 +39,8 @@ graph TD
 - **Actions**:
   1. *Classify input*:
      - Task description in chat or requirements file path → Start Phase 1.
-     - Existing `<SpecName>` or path `docs/specs/<SpecName>/` → **Resume**.
-  2. *Resume inspection (`docs/specs/<SpecName>/`)*:
+     - Existing `<SpecName>` or path `docs/specs/<SpecName>/` or `docs/<SpecName>/` → **Resume**.
+  2. *Resume inspection*: inspect both roots, `docs/specs/<SpecName>/` first, then fallback root `docs/<SpecName>/` (sub-skills may write artifacts under either). All artifact checks below run against the root that exists:
      - `spec.md` exists, no `plan.md` → Resume at Phase 2.
      - `plan.md` exists, unapproved/missing `review.md` → Resume at Phase 3.
      - `review.md` with `Status: CHANGES_REQUIRED` → Resume inside Phase 3 loop.
