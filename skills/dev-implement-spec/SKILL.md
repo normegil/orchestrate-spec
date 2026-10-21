@@ -10,7 +10,7 @@ Coordinate and iteratively invoke specialized sub-agents:
 1. **Executor** (`<skill_dir>/agents/executor.md`): Implements code changes, ensures clean compilation, and runs tests.
 2. **Test-Generator** (`<skill_dir>/agents/test-generator.md`): Generates unit and integration tests strictly mapped to `spec.md` acceptance criteria (`AC-n`) and `plan.md`.
 3. **Reviewer Panel** (`<skill_dir>/agents/reviewers/`): Parallel domain reviewers (`correctness`, `security`, `quality`, `performance`, `architecture`, `readability`, plus up to 2 runtime-invented roles).
-4. **Deterministic Gate & Synthesizer**: Executes automated checks, merges findings via `<skill_dir>/scripts/merge-findings.py`, and invokes **Review-Synthesizer** (`<skill_dir>/agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md`.
+4. **Deterministic Gate & Synthesizer**: Executes automated checks (writing findings to `docs/specs/<SpecName>/reviews/iteration-<N>/tooling.md`), merges findings via `<skill_dir>/scripts/merge-findings.py`, and invokes **Review-Synthesizer** (`<skill_dir>/agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md`.
 
 *Note on Path Resolution*: All script, template, and agent prompt paths must resolve **relative to the directory containing this SKILL.md** (`<skill_dir>`), not the project root.
 
@@ -38,8 +38,8 @@ Initialize `iteration = 1` (maximum iterations = 5).
 
 3. **Step C: Validation & Quality Review**
    - **C1 — Panel Selection**: Default panel of six fixed reviewers. Skip a domain only if diff provably touches none of its trigger surface (record 1-line justification). Invent at most 2 roles (`_template.md`, prefix `X1`/`X2`) if needed.
-   - **C2 — Deterministic Checks**: Run build, tests, and linters discovered from repository config. Severity: build/test failure = `BLOCKER`, linter error = `MAJOR`, warning = `MINOR`.
-   - **C3 — Parallel Fan-Out**: Spawn selected reviewers concurrently. Reviewers check changes against `plan.md` and `AC-n` criteria, writing findings to `docs/specs/<SpecName>/reviews/iteration-<N>/<domain>.md`.
+   - **C2 — Deterministic Checks**: Run build, tests, and linters discovered from repository config. Severity: build/test failure = `BLOCKER`, linter error = `MAJOR`, warning = `MINOR`. Write automated-check findings to `docs/specs/<SpecName>/reviews/iteration-<N>/tooling.md` using the findings format (reviewer: `tooling`, prefix `T<n>`).
+   - **C3 — Parallel Fan-Out**: Spawn selected reviewers concurrently, passing `tooling.md` to reviewers. Reviewers check changes against `plan.md` and `AC-n` criteria, writing findings to `docs/specs/<SpecName>/reviews/iteration-<N>/<domain>.md`.
    - **C4 — Merge & Synthesis**:
      - Run: `python <skill_dir>/scripts/merge-findings.py <SpecName> <iteration> [--previous <prev_iteration>]`.
      - Delegate to `review-synthesizer` (`<skill_dir>/agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md` including findings and an AC coverage matrix (`AC-n` → tests).

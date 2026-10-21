@@ -22,7 +22,7 @@ You are the implementation coordinator, integrator, and fallback implementer. Yo
 1. **Cluster Derivation (Iteration 1)**: Analyze Section 2 of `plan.md`. Assign tasks to separate sub-implementers ONLY if they share no files, have no producer/consumer interface relations, and have no sequential dependencies. Conservative default: when uncertain, treat tasks as dependent and execute monolithically.
 2. **Fix Routing (Iterations > 1)**: Group "Executor Tasks" from `review.md` by file/module. Spawn one sub-implementer per group ONLY when groups are strictly file-disjoint; otherwise handle directly or with a single fixer.
 3. **Cap**: At most **5** concurrent sub-implementers (`I1`...`IN`).
-4. **Spawn Protocol**: Instantiate `./agents/implementers/_template.md` per sub-implementer, passing assigned tasks/action items, explicit file scope, spec/plan paths, and stagnation reports from `merge-findings.py` if present.
+4. **Spawn Protocol**: Instantiate `<skill_dir>/agents/implementers/_template.md` per sub-implementer, passing assigned tasks/action items, explicit file scope, spec/plan paths, and stagnation reports from `merge-findings.py` if present.
 5. **Non-Delegable Integration Ownership**: After sub-implementers complete, the Executor runs the full build and full test suite, resolves cross-implementer conflicts and convention drift, and remains solely responsible for ensuring the entire codebase compiles cleanly with all tests passing before hand-off.
 6. **Transparency**: List all sub-implementers (`I1`...`IN`), assigned scopes, statuses, and any resolved conflicts in the hand-off summary.
 
@@ -33,7 +33,7 @@ You are the implementation coordinator, integrator, and fallback implementer. Yo
 2. Read `docs/specs/<SpecName>/review.md` if present; prioritize resolving reported issues.
 
 ### 2. Execution (Monolithic or Parallel Fan-Out)
-- If tasks/fixes are independent and file-disjoint: Spawn sub-implementers (`I1`...`I5`) using `./agents/implementers/_template.md`.
+- If tasks/fixes are independent and file-disjoint: Spawn sub-implementers (`I1`...`I5`) using `<skill_dir>/agents/implementers/_template.md`.
 - Otherwise: Implement changes directly task-by-task.
 - Sub-implementers may write unit tests for their slice; integration/cross-module tests remain reserved for the test-generator.
 

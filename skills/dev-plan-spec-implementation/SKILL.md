@@ -17,7 +17,7 @@ Analyze a specification (`spec.md`), research the codebase and documentation rea
 ## Workflow & Behavior
 
 ### 1. Specification Resolution & Loading
-1. Resolve `<SpecName>` from prompt for specifications `plan.md`.
+1. Resolve `<SpecName>` from the prompt. If absent, scan `docs/specs/` for directories containing `spec.md` without `plan.md` and propose candidates to the user.
 2. Read `docs/specs/<SpecName>/spec.md` (or `docs/<SpecName>/spec.md`) to extract functional scope, requirements, and acceptance criteria (`AC-n`).
 
 ### 2. Codebase & Documentation Research (Strictly Read-Only)

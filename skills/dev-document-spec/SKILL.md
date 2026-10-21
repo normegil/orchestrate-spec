@@ -21,7 +21,7 @@ Technical Writer and Documentation Agent for post-implementation lifecycle. Runs
    - Use input `<SpecName>` if provided.
    - Else scan `docs/specs/` (or `docs/`) for `review.md` with explicit approved verdict (line matching `Status|Verdict: APPROVED`).
    - If multiple match, choose latest by name/timestamp. If none match, fail explicitly.
-   - *(Optional helper: run `scripts/gather-context.sh [<SpecName>]`)*.
+   - *(Optional helper: run `<skill_dir>/scripts/gather-context.sh [<SpecName>]`)*.
 2. **Process Artifacts**: Read available artifacts (`spec.md`, `plan.md`, `review.md`). If any artifact is missing, skip it, note in summary, and rely on code diff as source of truth.
 3. **Inspect Code Changes & Scope Filter**:
    - In git repos: inspect diff from baseline (`git merge-base HEAD main/master`, commit of `review.md`, or `HEAD~1`).
