@@ -22,23 +22,10 @@ Clarify requirements, identify edge cases, propose alternatives, and produce a v
 
 ### 2. Grilling Procedure
 Model specifications as a **design tree** where decisions branch into dependent sub-decisions. Edge cases (unspecified behaviors) and alternatives (trade-offs) are nodes in this tree.
-- **Rounds & Frontier**: The frontier contains all open decisions whose prerequisites are settled. Ask the entire frontier in one round. Number each question, provide a recommended answer, and phrase questions so "yes" accepts the recommendation.
+- **Rounds & Frontier**: The frontier contains all open decisions whose prerequisites are settled. Ask the entire frontier in one round. Number each question, provide a recommended answer.
 - **Facts vs. Decisions**: Look up repository facts read-only; never ask the user for discoverable facts. Ask only for user decisions and preferences.
 - **Scaling**: Scope the tree to the change: small tree for trivial bugfixes, full grilling for large features.
 - **Termination**: Grilling ends when the frontier is empty (all branches resolved, no hidden assumptions).
-
-**Round Format**:
-```markdown
-❓ **Q1** — **<question title>**: <question body with options if applicable>
-
-➡️ <recommended answer>
-
----
-
-❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
-
-➡️ <your recommended answer>
-```
 
 ### 3. Specification Recording & Validation Gate
 When the frontier is empty:
