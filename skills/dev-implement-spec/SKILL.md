@@ -6,70 +6,56 @@ description: Orchestrates the iterative implementation loop across Executor, Tes
 # Specification Implementation Orchestrator – dev-implement-spec
 
 ## Role
-You are the Orchestration Agent for the specification implementation lifecycle. Your role is to coordinate and iteratively invoke specialized sub-agents:
-1. **Executor** (`./agents/executor.md`): Implements code changes, ensures compilation, and runs existing tests.
-2. **Test-Generator** (`./agents/test-generator.md`): Generates and adapts unit and integration tests strictly matching `spec.md`, `plan.md`, and implemented code.
-3. **Reviewer Panel** (`./agents/reviewers/`): Parallel specialized domain reviewers (`correctness`, `security`, `quality`, `performance`, `architecture`, `readability`, plus up to 2 runtime-invented roles).
-4. **Deterministic Gate & Synthesizer**: Runs automated linting, building, and testing checks, merges findings via `scripts/merge-findings.py`, and invokes **Review-Synthesizer** (`./agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md`.
+Coordinate and iteratively invoke specialized sub-agents:
+1. **Executor** (`<skill_dir>/agents/executor.md`): Implements code changes, ensures clean compilation, and runs tests.
+2. **Test-Generator** (`<skill_dir>/agents/test-generator.md`): Generates unit and integration tests strictly mapped to `spec.md` acceptance criteria (`AC-n`) and `plan.md`.
+3. **Reviewer Panel** (`<skill_dir>/agents/reviewers/`): Parallel domain reviewers (`correctness`, `security`, `quality`, `performance`, `architecture`, `readability`, plus up to 2 runtime-invented roles).
+4. **Deterministic Gate & Synthesizer**: Executes automated checks, merges findings via `<skill_dir>/scripts/merge-findings.py`, and invokes **Review-Synthesizer** (`<skill_dir>/agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md`.
 
-You manage loop transitions, monitor iteration limits, detect repetition, and report progress transparently until a verified solution is delivered.
+*Note on Path Resolution*: All script, template, and agent prompt paths must resolve **relative to the directory containing this SKILL.md** (`<skill_dir>`), not the project root.
 
 ## Workflow & Execution Rules
 
 ### 1. Specification Resolution & Initialization
-1. **Target Specification**:
-   - Resolve `<SpecName>` from user prompt or scan `docs/specs/` (fallback `docs/`) for directories containing `spec.md` and `plan.md` lacking completed approval.
-2. **Prerequisites Check**:
-   - Ensure `docs/specs/<SpecName>/spec.md` and `docs/specs/<SpecName>/plan.md` exist and are populated. Halt if missing.
+1. **Target Specification**: Resolve `<SpecName>` from prompt or scan `docs/specs/` (fallback `docs/`) for specifications containing `spec.md` and `plan.md`.
+2. **Prerequisites & Freshness Check**:
+   - Ensure `spec.md` and `plan.md` exist and are populated. Halt if missing.
+   - Warn user if `spec.md` was modified more recently than `plan.md` (stale plan).
+3. **Baseline Checkpoint**: Before iteration 1, verify the git working tree is clean (or ask user how to proceed) and record the baseline commit hash for reliable diffs and rollbacks.
 
 ### 2. Iteration Loop Execution
-Initialize `iteration = 1` (default maximum iterations = 5).
+Initialize `iteration = 1` (maximum iterations = 5).
 
 #### Iteration Cycle:
-For each iteration:
+1. **Step A: Code Implementation (Prompt: `<skill_dir>/agents/executor.md`)**
+   - Iteration 1: Implement Section 2 of `plan.md` (fan out to bounded sub-implementers for file-disjoint tasks).
+   - Subsequent Iterations: Implement action items from `review.md`.
+   - Ensure all changes compile and pass existing test suites.
 
-1. **Step A: Code Implementation & Compilation (Prompt: `./agents/executor.md`)**
-   - Iteration 1: Delegate to `executor` to implement Section 2 of `plan.md`, fanning out to bounded sub-implementers under its Parallelization Rules when tasks are provably independent.
-   - Subsequent Iterations: Delegate to `executor` with action items from `review.md` (fanning out to bounded sub-implementers when action items are file-disjoint).
-   - The `executor` coordinates implementation, runs integration builds and test suites, and ensures all changes compile cleanly and pass tests. (Sub-implementer fan-out is internal to the executor; the orchestrator never spawns sub-implementers directly).
-
-2. **Step B: Test Generation & Execution (Prompt: `./agents/test-generator.md`)**
-   - Iteration 1: Delegate to `test-generator` to create Unit/Integration tests from Section 3 of `plan.md`.
-   - Subsequent Iterations: Delegate to `test-generator` if `review.md` identifies test additions or adjustments.
-   - The `test-generator` verifies test compilation and passes tests against implemented code.
+2. **Step B: Test Generation & Traceability (Prompt: `<skill_dir>/agents/test-generator.md`)**
+   - Create/adapt unit and integration tests covering Section 3 of `plan.md` and all `spec.md` acceptance criteria (`AC-n`, falling back to prose requirements if unnumbered).
+   - Ensure tests compile and pass against implemented code.
 
 3. **Step C: Validation & Quality Review**
-   - **C1 — Panel Selection**:
-     - Default panel: six fixed domain reviewers (`reviewer-correctness.md`, `reviewer-security.md`, `reviewer-quality.md`, `reviewer-performance.md`, `reviewer-architecture.md`, `reviewer-readability.md`).
-     - **Skip Rule**: A reviewer may be skipped only if the diff provably touches none of that domain's trigger surface (e.g., no I/O, no user input, no auth → skip security). Record each skip with a 1-line justification in status update.
-     - **Invented Roles**: When changes require domain focus outside fixed roles, orchestrator may invent at most 2 roles derived strictly from `./agents/reviewers/_template.md` (prefix `X1`/`X2`, announced in status update).
-   - **C2 — Deterministic Checks (Linting, Building & Testing)**:
-     - Discover and execute project build, test suites, and configured linters/static analyzers directly from repository config. Never guess commands; record missing tools as unconfigured.
-     - Severity mapping for automated tool findings: build/test failure → `BLOCKER` (action: `executor` or `test-generator`), linter/static analyzer error → `MAJOR`, warning → `MINOR`.
-   - **C3 — Parallel Fan-Out**:
-     - Spawn all selected reviewers concurrently in parallel.
-     - Pass `<SpecName>`, `iteration`, and reviewer prompt path (with instructions not to duplicate findings caught by automated linting, building, or testing tools).
-     - Each reviewer writes findings to `docs/specs/<SpecName>/reviews/iteration-<N>/<domain>.md`.
+   - **C1 — Panel Selection**: Default panel of six fixed reviewers. Skip a domain only if diff provably touches none of its trigger surface (record 1-line justification). Invent at most 2 roles (`_template.md`, prefix `X1`/`X2`) if needed.
+   - **C2 — Deterministic Checks**: Run build, tests, and linters discovered from repository config. Severity: build/test failure = `BLOCKER`, linter error = `MAJOR`, warning = `MINOR`.
+   - **C3 — Parallel Fan-Out**: Spawn selected reviewers concurrently. Reviewers check changes against `plan.md` and `AC-n` criteria, writing findings to `docs/specs/<SpecName>/reviews/iteration-<N>/<domain>.md`.
    - **C4 — Merge & Synthesis**:
-     - Run: `python skills/dev-implement-spec/scripts/merge-findings.py <SpecName> <iteration> [--previous <prev_iteration>]`.
-     - If the script fails validation, re-invoke the offending reviewer to fix its findings file.
-     - Delegate to `review-synthesizer` (`./agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md` from the script's output.
+     - Run: `python <skill_dir>/scripts/merge-findings.py <SpecName> <iteration> [--previous <prev_iteration>]`.
+     - Delegate to `review-synthesizer` (`<skill_dir>/agents/review-synthesizer.md`) to write `docs/specs/<SpecName>/review.md` including findings and an AC coverage matrix (`AC-n` → tests).
 
 4. **Step D: Evaluation & Routing**
-   - Read `Status: [APPROVED | CHANGES_REQUIRED]` in `docs/specs/<SpecName>/review.md`.
-   - **If `APPROVED`**: Implementation complete and verified. Conclude loop and deliver final summary.
-   - **If `CHANGES_REQUIRED`**:
-     - Increment `iteration = iteration + 1`.
-     - Check loop limits. Log stagnation report from merge script for implementer context.
-     - Continue to next iteration using action items from `review.md`.
+   - Check `Status: [APPROVED | CHANGES_REQUIRED]` in `review.md`.
+   - **If `APPROVED`**: Conclude loop and deliver final summary.
+   - **If `CHANGES_REQUIRED`**: Increment `iteration = iteration + 1`. If iteration <= 5, loop back to Step A with action items.
 
-### 3. Monitoring, Safeguards & User Interaction
-1. **Iteration Limit & Escalation**: At most **5 iterations**. If iteration 5 finishes with `CHANGES_REQUIRED` (or unresolved stagnation across iterations), pause and escalate to the user with blocking context and stagnation history.
-2. **Stagnation Detection**: `merge-findings.py` tracks repeating finding signatures (`file + category + severity`) across consecutive cycles to inform the executor and test-generator. Stagnation is reported in intermediate reviews but does not escalate to the user before the completion of 5 iterations.
-3. **Transparency**: Post concise progress updates before each step (announcing active reviewers, skipped roles, invented domains, and executor sub-implementer fan-out with IDs and scopes).
+### 3. Monitoring, Safeguards & Escalation
+1. **Iteration Limit**: At most **5 iterations**. If iteration 5 ends with `CHANGES_REQUIRED`, pause and escalate to the user with blocking findings and stagnation history.
+2. **Stagnation Tracking**: `merge-findings.py` tracks repeating finding signatures across iterations to guide implementers. Stagnation is reported in intermediate reviews and escalates only after iteration 5.
+3. **Transparency**: Post brief progress updates before each step (active/skipped reviewers, invented roles, executor sub-tasks).
 
 ### 4. Completion Deliverables
-When the loop finishes successfully:
-1. All changes compile and tests pass cleanly.
-2. `docs/specs/<SpecName>/review.md` confirms `Status: APPROVED`.
-3. Present summary of modified components, tests, and panel review results.
+Upon successful completion (`APPROVED`):
+1. Clean build and passing test suites.
+2. `docs/specs/<SpecName>/review.md` with `Status: APPROVED` and verified AC test coverage.
+3. Summary of modified components, tests, and panel review results.

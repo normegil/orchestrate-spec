@@ -2,7 +2,7 @@
 
 [![skills.sh](https://skills.sh/b/normegil/orchestrate-spec)](https://skills.sh/normegil/orchestrate-spec)
 
-A suite of [agent skills](https://agentskills.io) implementing a complete spec-driven development lifecycle: from requirements analysis, through implementation planning and an iterative implement/test/review loop, to post-implementation documentation.
+A suite of [agent skills](https://agentskills.io) implementing a spec-driven development lifecycle: interactive requirements grilling, architectural planning, an iterative implement/test/review loop, and documentation.
 
 ## Installation
 
@@ -12,51 +12,58 @@ npx skills add normegil/orchestrate-spec
 
 ## Usage
 
-The main entry point is the orchestrator skill. Typical invocations:
+The main entry point is the orchestrator skill:
 
 ```
-/dev-orchestrate-spec <MySpec>
-/dev-orchestrate-spec <LinkToSpecDefinitionFile>
+/dev-orchestrate-spec <SpecName>
+/dev-orchestrate-spec <LinkToRequirementsFile>
 ```
 
-- `<MySpec>`: describe the feature or bug in conversation; the pipeline starts with interactive requirements analysis.
-- `<LinkToSpecDefinitionFile>`: point to a file containing your requirements (e.g., meeting notes, a ticket export); the pipeline starts from that content.
+- `<MySpec>`: Describe a task in conversation; starts Phase 1 requirements grilling.
+- `<LinkToRequirementsFile>`: Point to a requirements file; starts Phase 1 from loaded content.
+- `<SpecName>`: 
+  - Describe a task in conversation; starts Phase 1 requirements grilling OR 
+  - Resume an existing specification pipeline from its detected phase.
 
-Each phase can also be invoked individually with its own skill — see [The skills](#the-skills).
+Each phase can also run standalone — see [The skills](#the-skills).
 
 ## How it works
 
-`dev-orchestrate-spec` coordinates four specialized skills as a single pipeline. Every skill reads and writes under `docs/specs/<SpecName>/`, and the specification name is locked at the start and passed from phase to phase.
+`dev-orchestrate-spec` coordinates specialized skills across standard phases under `docs/specs/<SpecName>/`:
 
-Human validation gates are enforced: `spec.md` (phase 1) and `plan.md` (phase 2) are never written without your explicit approval. The implementation loop is automated across an executor, test-generator, a parallel reviewer panel with scripted static checks, and a deterministic review gate; it runs at most 5 iterations before escalating to you, and stops for guidance if the same review remarks repeat without progress.
+1. **Requirements Grilling (`dev-analyze`)**: Models requirements as a design tree and asks batched question rounds with recommended answers while discovering repository facts read-only. Grilling ends when the decision frontier is empty.
+2. **Implementation Planning (`dev-plan-spec-implementation`)**: Researches codebase context read-only, generates fine-grained tasks, and maps all acceptance criteria (`AC-n`) to tests.
+3. **Implementation Loop (`dev-implement-spec`)**: Automated loop coordinating executor, test-generator, and parallel reviewer panel with deterministic gating. Runs at most 5 iterations; tracks stagnation across cycles and escalates only after iteration 5.
+4. **Documentation (`dev-document-spec`)**: Enriches in-code documentation and project reference guides.
+
+### Validation Gates & Invalidation
+
+- **Gates**: `spec.md` (Phase 1) and `plan.md` (Phase 2) are never written without explicit user confirmation.
+- **Invalidation**: Updating `spec.md` after `plan.md` is written invalidates the plan (re-runs Phase 2). Updating `plan.md` during or after Phase 3 re-runs Phase 3.
 
 ### Artifacts
 
-Each specification lives in its own directory:
-
 ```
 docs/specs/<SpecName>/
-├── spec.md     # Requirements and acceptance criteria (phase 1)
-├── plan.md     # Fine-grained implementation plan (phase 2)
+├── spec.md     # Requirements, testable Acceptance Criteria (AC-n), and Decision Log
+├── plan.md     # Fine-grained implementation steps and AC test verification plan
 ├── reviews/    # Intermediate per-domain findings (per iteration)
-└── review.md   # Final consolidated review report (phase 3)
+└── review.md   # Final review report and AC coverage matrix (Phase 3)
 ```
 
-`<SpecName>` follows the convention `<yyyy-MM-dd-HH-mm>-<Bug|Feature>-<ResumeIn2Or3Words>`, where the prefix is the creation date and time (e.g., `2026-10-15-14-30-Feature-User-Management`).
+`<SpecName>` format: `<yyyy-MM-dd-HH-mm>-<Bug|Feature>-<ResumeIn2Or3Words>` (e.g., `2026-10-15-14-30-Feature-User-Management`).
 
 ## The skills
 
-| Skill | Role | Writes |
+| Skill | Role | Output |
 |---|---|---|
-| `dev-orchestrate-spec` | Orchestrates the full pipeline end to end | — |
-| `dev-analyze` | Clarifies requirements interactively, identifies edge cases, proposes alternatives. Read-only except for the spec file | `docs/specs/<SpecName>/spec.md` |
-| `dev-plan-spec-implementation` | Researches the codebase read-only, drafts fine-grained actionable steps with a verification plan | `docs/specs/<SpecName>/plan.md` |
-| `dev-implement-spec` | Runs the iterative implement / test / review loop across executor (with optional fan-out to bounded sub-implementers), test-generator (single global QA pass), a parallel reviewer panel, and review-synthesizer (bundled in `skills/dev-implement-spec/agents/`) | code, tests, `docs/specs/<SpecName>/reviews/`, `docs/specs/<SpecName>/review.md` |
-| `dev-document-spec` | After approval: enriches in-code docs (public APIs, complex logic, gotchas) and updates project `README.md` and `docs/` | docs, comments |
+| `dev-orchestrate-spec` | Orchestrates lifecycle end-to-end (intake, resume, invalidation) | — |
+| `dev-analyze` | Interactive grilling rounds over design tree; records spec | `docs/specs/<SpecName>/spec.md` |
+| `dev-plan-spec-implementation` | Read-only codebase research, AC test mapping, and plan review | `docs/specs/<SpecName>/plan.md` |
+| `dev-implement-spec` | Iterative executor/test-gen/reviewer loop with deterministic gate | Code, tests, reviews, `review.md` |
+| `dev-document-spec` | Post-approval in-code and system documentation | In-code docs, `README.md`, `docs/` |
 
-### Using a phase individually
-
-Each skill can run standalone and will resolve its target specification itself:
+### Standalone Invocations
 
 ```
 /dev-analyze <task description or requirements file>
@@ -65,14 +72,17 @@ Each skill can run standalone and will resolve its target specification itself:
 /dev-document-spec <SpecName>
 ```
 
-If `<SpecName>` is omitted, the skill scans `docs/specs/` for specifications that are ready for its phase (e.g., a spec with no plan yet for the planner) and proposes candidates.
+If `<SpecName>` is omitted, the skill scans `docs/specs/` and proposes matching specifications ready for that phase.
 
 ## Guardrails
 
-- **Role separation** — the analyst and planner never touch code; all reviewers and the synthesizer operate read-only on project code; the executor, sub-implementers (bound by the executor's constraints), and test-generator do not alter architecture without review.
-- **Confirmation gates** — no `spec.md` or `plan.md` is written without explicit user validation.
-- **Bounded automation** — the implementation loop caps at 5 iterations and escalates to the user if changes remain unapproved at the end of iteration 5.
-- **Escalation** — unresolved questions, build errors, or review failures unapproved after 5 iterations pause the pipeline and surface actionable context to you.
+- **Role separation**: Analyst and planner do not modify code; reviewers operate strictly read-only; executor and test-generator adhere strictly to `spec.md` and `plan.md`.
+- **Explicit validation**: No `spec.md` or `plan.md` is saved without human approval.
+- **Bounded execution**: Implementation loop caps at 5 iterations before human escalation.
+
+## Citations & Acknowledgments
+
+The interactive grilling procedure is adapted from Matt Pocock's [grilling skill](https://github.com/mattpocock/skills/tree/main/skills/productivity/grilling).
 
 ## License
 
