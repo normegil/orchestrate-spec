@@ -19,11 +19,10 @@ The main entry point is the orchestrator skill:
 /dev-orchestrate-spec <LinkToRequirementsFile>
 ```
 
-- `<MySpec>`: Describe a task in conversation; starts Phase 1 requirements grilling.
-- `<LinkToRequirementsFile>`: Point to a requirements file; starts Phase 1 from loaded content.
 - `<SpecName>`: Can be one of 2 things, depending on the presence of expected files:
   - Describe a task in conversation; starts Phase 1 requirements grilling.
   - Resume an existing specification pipeline from its detected phase.
+- `<LinkToRequirementsFile>`: Point to a requirements file; starts Phase 1 from loaded content.
 
 Each phase can also run standalone — see [The skills](#the-skills).
 
