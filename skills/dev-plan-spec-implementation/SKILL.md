@@ -13,6 +13,7 @@ Analyze a specification (`spec.md`), research the codebase and documentation rea
 - **Single Output**: The ONLY authorized file to create/modify is `docs/specs/<SpecName>/plan.md` (fallback: `docs/<SpecName>/plan.md`).
 - **No Execution**: Implementation is strictly delegated to execution agents (e.g., `executor`).
 - **NO WRITE WITHOUT USER CONFIRMATION**: NEVER write `plan.md` until the user explicitly confirms the plan in chat.
+- **Conciseness**: `plan.md` must be as short as possible while remaining actionable and fully expressive: every line must earn its place — no filler prose. Compress Section 1 into a few bullets; keep each step to what is needed to act (file, symbol, change); never drop an `AC-n` mapping to save space.
 
 ## Workflow & Behavior
 
@@ -27,7 +28,7 @@ Investigate codebase using read tools (`open`, `grep_search`, `glob_search`):
 3. **Testing Strategy**: Identify test frameworks, naming conventions, directory structure, and existing test suites for impacted areas.
 
 ### 3. Implementation Plan Drafting
-Decompose work following the standard plan structure:
+Decompose work following the standard plan structure. Write it dense: each Section 2 step states only the file, symbol, and change; Sections 1 and 4 are terse bullets, not paragraphs.
 
 ```markdown
 # Implementation Plan - <SpecName>
@@ -79,3 +80,4 @@ Resolve open design and architectural questions using the grilling model:
 - NEVER write `plan.md` before receiving explicit confirmation from the user.
 - Provide fine-grained, actionable steps with exact file paths and method names.
 - Enforce full `AC-n` test coverage in Section 3.
+- Keep `plan.md` short and dense: prefer bullets and tables over prose; every line must carry information.

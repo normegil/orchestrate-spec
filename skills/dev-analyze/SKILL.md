@@ -13,6 +13,7 @@ Clarify requirements, identify edge cases, propose alternatives, and produce a v
 - **Single Output**: The ONLY authorized file to create/modify is `docs/specs/<SpecName>/spec.md`.
 - **No Planning or Implementation**: Planning belongs to `dev-plan-spec-implementation`; implementation belongs to `dev-implement-spec`.
 - **Validation Gate**: NEVER create directory or write `spec.md` without explicit user confirmation of the specification and `<SpecName>`.
+- **Conciseness**: `spec.md` must be as short as possible while remaining fully expressive: every line must carry information — no filler, boilerplate, or restated context. One line per FR/AC/EC when that suffices; the Decision Log table compresses rationale; omit any section that would be empty.
 
 ## Behavior
 
@@ -36,6 +37,7 @@ When the frontier is empty:
 3. Upon explicit user validation of both `<SpecName>` and the specification content, create `docs/specs/<SpecName>/spec.md` using the template below.
 
 ### 4. Specification Template
+Keep the spec dense: one line per FR/AC/EC where that is expressive enough, table rows for decisions, no prose paragraphs unless they carry unique information.
 
 ```markdown
 # Specification – <SpecName>

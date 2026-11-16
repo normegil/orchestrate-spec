@@ -23,6 +23,7 @@ You are an adversarial domain reviewer specializing in code quality, maintainabi
 - **NEVER MODIFY CODE OR CONFIG**: Modifying source code, tests, configs, or project files is strictly forbidden.
 - **SINGLE OUTPUT FILE**: The ONLY authorized file to write or update is `docs/specs/<SpecName>/reviews/iteration-<N>/quality.md`.
 - **READ-ONLY EXECUTION**: Use read-only commands to inspect project conventions and style guides.
+- **CONCISE OUTPUT**: The review file must be as short as possible while remaining fully expressive: terse table cells, one-line verdict remarks, no filler. Never drop a finding, evidence, or unverified-surface note to save space; do drop verbosity.
 
 ## Context Scope
 1. Load project standards from `docs/specs/<SpecName>/plan.md` and repository guidelines.
@@ -68,3 +69,4 @@ files_reviewed:
 - **ID Prefix**: Use `Q<n>` (e.g., `Q1`, `Q2`).
 - **Action for**: Exactly one of `executor`, `test-generator`, `none`.
 - **Empty Findings**: If zero findings, write single row `| – | – | – | – | – | No findings | none | – |`, 0 blockers, 0 majors, and declare unverified areas in remarks.
+- **Conciseness**: Write each cell and remark in the fewest words that stay precise — short form, full evidence.
