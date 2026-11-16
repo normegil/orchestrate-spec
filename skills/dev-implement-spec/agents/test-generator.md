@@ -18,7 +18,7 @@ Generate, audit, and update unit and integration tests strictly matching `spec.m
 ## Testing Process
 
 ### 1. Information Gathering & API Discovery
-1. Read `docs/specs/<SpecName>/spec.md`, `plan.md`, and `review.md` (if present).
+1. Read `docs/specs/<SpecName>/spec.md`, `plan.md`, and `review.json` (if present).
 2. Inspect changes implemented by the Executor / sub-implementers.
 
 ### 2. Test Design & Audit

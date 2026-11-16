@@ -3,15 +3,19 @@
 merge-findings.py - Deterministic findings validation, deduplication, gate computation,
 and stagnation reporting for the dev-implement-spec review panel.
 
+Ingests the reviewers' JSON files (docs/specs/<SpecName>/reviews/iteration-<N>/*.json)
+and prints a single consolidated JSON report to stdout.
+
 Standard library only. Python 3 compatible.
 Usage:
     python3 merge-findings.py <SpecName> <iteration> [--previous <iteration_or_tag>]
 
 From iteration 2 onward, --previous defaults to <iteration - 1>.
+Exit codes: 0 = report printed, 1 = setup error, 2 = VALIDATION FAILED.
 """
 
 import sys
-import os
+import json
 import re
 import argparse
 from pathlib import Path
@@ -19,6 +23,7 @@ from pathlib import Path
 VALID_SEVERITIES = {"BLOCKER", "MAJOR", "MINOR", "INFO"}
 SEVERITY_ORDER = {"BLOCKER": 4, "MAJOR": 3, "MINOR": 2, "INFO": 1}
 VALID_ACTIONS = {"executor", "test-generator", "none"}
+REQUIRED_FINDING_FIELDS = ["id", "severity", "file", "line", "category", "title", "detail", "suggested_fix", "action_for"]
 DOMAIN_PREFIX_MAP = {
     "correctness": "C",
     "security": "S",
@@ -28,6 +33,8 @@ DOMAIN_PREFIX_MAP = {
     "readability": "R",
     "tooling": "T",
 }
+# Files written by the synthesizer inside an iteration dir; never ingested as reviewer output.
+EXCLUDED_FILES = {"synthesis.json"}
 
 
 def find_spec_dir(spec_name):
@@ -44,7 +51,7 @@ def find_spec_dir(spec_name):
 
 
 def parse_iteration_number(iter_str):
-    m = re.search(r"(\d+)", iter_str)
+    m = re.search(r"(\d+)", str(iter_str))
     if m:
         return int(m.group(1))
     return int(iter_str)
@@ -52,165 +59,91 @@ def parse_iteration_number(iter_str):
 
 def parse_findings_file(file_path):
     """
-    Parses a findings markdown file.
-    Returns (metadata, findings_list, verdict_counts, remarks, errors).
+    Parses one reviewer JSON file.
+    Returns (reviewer, summary, findings_list, errors).
     """
     errors = []
-    metadata = {}
+    summary = ""
     findings = []
-    verdict_counts = {"blockers": 0, "majors": 0}
-    remarks = ""
 
     if not file_path.is_file():
-        errors.append(f"File not found: {file_path}")
-        return metadata, findings, verdict_counts, remarks, errors
+        return file_path.stem, summary, findings, [f"File not found: {file_path}"]
 
     try:
-        content = file_path.read_text(encoding="utf-8")
+        data = json.loads(file_path.read_text(encoding="utf-8"))
     except Exception as e:
-        errors.append(f"Cannot read {file_path}: {e}")
-        return metadata, findings, verdict_counts, remarks, errors
+        return file_path.stem, summary, findings, [f"Cannot parse JSON in {file_path.name}: {e}"]
 
-    # 1. Parse frontmatter
-    fm_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
-    if not fm_match:
-        errors.append("Missing or malformed YAML frontmatter (must start and end with ---)")
-        body = content
-    else:
-        fm_text = fm_match.group(1)
-        body = content[fm_match.end():]
-        for line in fm_text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if ":" in line:
-                k, v = line.split(":", 1)
-                k = k.strip()
-                v = v.strip()
-                if v.startswith("[") and v.endswith("]"):
-                    items = [x.strip().strip("'\"") for x in v[1:-1].split(",") if x.strip()]
-                    metadata[k] = items
-                elif v:
-                    metadata[k] = v.strip("'\"")
-                else:
-                    metadata[k] = []
-            elif line.startswith("- ") and "files_reviewed" in metadata and isinstance(metadata["files_reviewed"], list):
-                metadata["files_reviewed"].append(line[2:].strip().strip("'\""))
+    if not isinstance(data, dict):
+        return file_path.stem, summary, findings, [f"{file_path.name}: top level must be a JSON object"]
 
-    reviewer = metadata.get("reviewer")
-    if not reviewer:
-        errors.append("Frontmatter missing required 'reviewer' field")
+    reviewer = data.get("reviewer") or file_path.stem
+    summary = str(data.get("summary", "")).strip()
+    raw_findings = data.get("findings", [])
+    if not isinstance(raw_findings, list):
+        return reviewer, summary, findings, [f"{file_path.name}: 'findings' must be an array"]
 
-    # 2. Parse table
-    # Expected table columns: ID | Severity | File | Line | Category | Description | Action for | Suggested action
-    table_lines = []
-    in_table = False
-    for line in body.splitlines():
-        s = line.strip()
-        if s.startswith("|") and s.endswith("|"):
-            parts = [p.strip() for p in s.split("|")[1:-1]]
-            if len(parts) >= 8:
-                if "ID" in parts[0] and "Severity" in parts[1]:
-                    in_table = True
-                    continue
-                if in_table:
-                    if all(re.match(r"^:?-+:?$", p) for p in parts):
-                        continue  # separator line
-                    table_lines.append(parts)
-        elif in_table and s and not s.startswith("|"):
-            in_table = False
-
-    # 3. Parse Domain verdict section
-    blocker_m = re.search(r"-\s*blockers\s*:\s*(\d+)", body, re.IGNORECASE)
-    major_m = re.search(r"-\s*majors\s*:\s*(\d+)", body, re.IGNORECASE)
-    remarks_m = re.search(r"-\s*remarks\s*:\s*(.+)", body, re.IGNORECASE)
-
-    if blocker_m:
-        verdict_counts["blockers"] = int(blocker_m.group(1))
-    else:
-        errors.append("Domain verdict missing '- blockers: <count>'")
-
-    if major_m:
-        verdict_counts["majors"] = int(major_m.group(1))
-    else:
-        errors.append("Domain verdict missing '- majors: <count>'")
-
-    if remarks_m:
-        remarks = remarks_m.group(1).strip()
-    else:
-        # Check if remarks are under a heading or multi-line
-        r_sec = re.search(r"##\s*Domain verdict.*?\n(.*?)(?=\n##|\Z)", body, re.DOTALL | re.IGNORECASE)
-        if r_sec:
-            rem_lines = [l.strip() for l in r_sec.group(1).splitlines() if l.strip() and not l.strip().startswith("- blockers") and not l.strip().startswith("- majors")]
-            if rem_lines:
-                remarks = " ".join(rem_lines).lstrip("- remarks:").strip()
-
-    # 4. Validate findings rows
-    actual_blockers = 0
-    actual_majors = 0
-
-    for row in table_lines:
-        fid, sev, fpath, line_no, cat, desc, act_for, sug_act = [x.strip() for x in row[:8]]
-        
-        # Check for empty findings row
-        if (fid in ("–", "-", "N/A", "none") or not fid) and ("no findings" in desc.lower() or "no findings" in cat.lower() or sev in ("–", "-", "NONE", "N/A")):
+    for i, raw in enumerate(raw_findings):
+        where = f"{file_path.name} finding #{i + 1}"
+        if not isinstance(raw, dict):
+            errors.append(f"{where}: must be an object")
+            continue
+        missing = [f for f in REQUIRED_FINDING_FIELDS if f not in raw or raw[f] in (None, "")]
+        if missing:
+            errors.append(f"{where}: missing required field(s): {', '.join(missing)}")
             continue
 
-        sev_upper = sev.upper()
-        if sev_upper not in VALID_SEVERITIES:
-            errors.append(f"Invalid severity '{sev}' in finding {fid}. Must be one of {VALID_SEVERITIES}")
-        else:
-            if sev_upper == "BLOCKER":
-                actual_blockers += 1
-            elif sev_upper == "MAJOR":
-                actual_majors += 1
+        fid = str(raw["id"]).strip()
+        sev = str(raw["severity"]).strip().upper()
+        act_for = str(raw["action_for"]).strip().lower()
 
-        act_for_lower = act_for.lower()
-        if act_for_lower not in VALID_ACTIONS:
-            errors.append(f"Invalid 'Action for' '{act_for}' in finding {fid}. Must be one of {VALID_ACTIONS}")
+        if sev not in VALID_SEVERITIES:
+            errors.append(f"{where}: invalid severity '{raw['severity']}'. Must be one of {sorted(VALID_SEVERITIES)}")
+        if act_for not in VALID_ACTIONS:
+            errors.append(f"{where}: invalid action_for '{raw['action_for']}'. Must be one of {sorted(VALID_ACTIONS)}")
 
         # ID prefix check
-        if reviewer:
-            rev_lower = str(reviewer).lower()
-            expected_prefix = DOMAIN_PREFIX_MAP.get(rev_lower)
-            if expected_prefix:
-                if not re.match(rf"^{expected_prefix}\d+$", fid, re.IGNORECASE):
-                    errors.append(f"Finding ID '{fid}' does not match prefix '{expected_prefix}' for reviewer '{reviewer}' (e.g. {expected_prefix}1)")
-            else:
-                # Invented role: prefix should be X1 or X2
-                if not re.match(r"^X[12]-\d+$", fid, re.IGNORECASE) and not re.match(r"^X[12]\d+$", fid, re.IGNORECASE):
-                    errors.append(f"Invented reviewer '{reviewer}' finding ID '{fid}' must use prefix X1 or X2 (e.g. X1-1 or X11)")
+        rev_lower = str(reviewer).lower()
+        expected_prefix = DOMAIN_PREFIX_MAP.get(rev_lower)
+        if expected_prefix:
+            if not re.match(rf"^{expected_prefix}\d+$", fid, re.IGNORECASE):
+                errors.append(f"{where}: finding ID '{fid}' does not match prefix '{expected_prefix}' for reviewer '{reviewer}' (e.g. {expected_prefix}1)")
+        else:
+            # Invented role: prefix must be X1- or X2-
+            if not re.match(r"^X[12]-\d+$", fid, re.IGNORECASE):
+                errors.append(f"{where}: invented reviewer '{reviewer}' finding ID '{fid}' must use prefix X1 or X2 (e.g. X1-1)")
+
+        line_val = raw["line"]
+        if not isinstance(line_val, (int, str)):
+            errors.append(f"{where}: 'line' must be an integer or a range string like '42-45', got {type(line_val).__name__}")
 
         findings.append({
             "id": fid,
-            "severity": sev_upper,
-            "file": fpath,
-            "line": line_no,
-            "category": cat,
-            "description": desc,
-            "action_for": act_for_lower,
-            "suggested_action": sug_act,
-            "reviewer": reviewer or "unknown",
-            "source_file": file_path.name
+            "severity": sev if sev in VALID_SEVERITIES else str(raw["severity"]),
+            "file": str(raw["file"]).strip(),
+            "line": line_val,
+            "category": str(raw["category"]).strip(),
+            "title": str(raw["title"]).strip(),
+            "detail": str(raw["detail"]).strip(),
+            "suggested_fix": str(raw["suggested_fix"]).strip(),
+            "action_for": act_for if act_for in VALID_ACTIONS else str(raw["action_for"]),
+            "reviewer": reviewer,
+            "source_file": file_path.name,
         })
 
-    # Validate declared vs actual counts
-    if blocker_m and verdict_counts["blockers"] != actual_blockers:
-        errors.append(f"Declared blockers ({verdict_counts['blockers']}) does not match table count ({actual_blockers})")
-    if major_m and verdict_counts["majors"] != actual_majors:
-        errors.append(f"Declared majors ({verdict_counts['majors']}) does not match table count ({actual_majors})")
-
-    return metadata, findings, verdict_counts, remarks, errors
+    return reviewer, summary, findings, errors
 
 
 def parse_line_range(line_str):
     """
-    Parses line strings like '42', '42-45', '42,45', '–' into a set of line integers.
+    Parses line values like 42, '42', '42-45', '42,45' into a set of line integers.
     """
-    if not line_str or line_str in ("–", "-", "N/A"):
+    if isinstance(line_str, int):
+        return {line_str}
+    if not line_str or str(line_str) in ("–", "-", "N/A"):
         return set()
     nums = set()
-    for part in line_str.replace(";", ",").split(","):
+    for part in str(line_str).replace(";", ",").split(","):
         part = part.strip()
         if "-" in part:
             bounds = part.split("-", 1)
@@ -234,8 +167,7 @@ def deduplicate_findings(findings):
     overlapping line ranges. Keeps the highest severity.
 
     A finding without line information never overlaps: distinct defects in
-    the same file and category must survive (e.g. two MAJOR security issues,
-    one with a line number and one without).
+    the same file and category must survive.
     """
     merged = []
     discarded = []
@@ -251,10 +183,7 @@ def deduplicate_findings(findings):
             ext_cat = existing["category"].strip().lower()
             if item_file and item_file == ext_file and item_cat and item_cat == ext_cat:
                 ext_lines = parse_line_range(existing["line"])
-                # Merge only when both line ranges exist and actually overlap.
-                # "No line" never overlaps.
                 overlap = bool(item_lines) and bool(ext_lines) and not item_lines.isdisjoint(ext_lines)
-
                 if overlap:
                     dup_idx = i
                     break
@@ -264,11 +193,10 @@ def deduplicate_findings(findings):
             existing_sev_val = SEVERITY_ORDER.get(existing["severity"], 0)
             item_sev_val = SEVERITY_ORDER.get(item["severity"], 0)
             if item_sev_val > existing_sev_val:
-                # Replace with higher severity finding
-                discarded.append((existing, f"merged with {item['reviewer']}-{item['id']}"))
+                discarded.append({"id": existing["id"], "severity": existing["severity"], "file": existing["file"], "line": existing["line"], "category": existing["category"], "reason": f"merged with {item['reviewer']}-{item['id']}"})
                 merged[dup_idx] = item
             else:
-                discarded.append((item, f"merged with {existing['reviewer']}-{existing['id']}"))
+                discarded.append({"id": item["id"], "severity": item["severity"], "file": item["file"], "line": item["line"], "category": item["category"], "reason": f"merged with {existing['reviewer']}-{existing['id']}"})
         else:
             merged.append(item)
 
@@ -288,12 +216,58 @@ def check_stagnation(curr_findings, prev_findings):
     for f in curr_findings:
         sig = (f["file"].strip().lower(), f["category"].strip().lower(), f["severity"].upper())
         if sig in prev_sigs:
-            stagnant.append((f, prev_sigs[sig]))
+            stagnant.append({
+                "current_id": f["id"],
+                "previous_id": prev_sigs[sig]["id"],
+                "severity": f["severity"],
+                "file": f["file"],
+                "line": f["line"],
+                "category": f["category"],
+            })
     return stagnant
 
 
+def load_iteration_findings(iter_dir):
+    """
+    Loads and validates all reviewer JSON files in an iteration directory.
+    Returns (panel_summary, all_findings, errors_dict).
+    """
+    panel_summary = []
+    all_findings = []
+    all_errors = {}
+    seen_ids = set()
+
+    finding_files = sorted(p for p in iter_dir.glob("*.json") if p.name not in EXCLUDED_FILES)
+    for fpath in finding_files:
+        reviewer, summary, findings, errors = parse_findings_file(fpath)
+
+        for f in findings:
+            fid = f["id"]
+            if fid in seen_ids:
+                errors.append(f"Duplicate finding ID '{fid}' across review files")
+            else:
+                seen_ids.add(fid)
+
+        if errors:
+            all_errors[fpath.name] = errors
+
+        blockers = sum(1 for f in findings if f["severity"] == "BLOCKER")
+        majors = sum(1 for f in findings if f["severity"] == "MAJOR")
+        all_findings.extend(findings)
+        panel_summary.append({
+            "reviewer": reviewer,
+            "file": fpath.name,
+            "summary": summary,
+            "blockers": blockers,
+            "majors": majors,
+            "findings": findings,
+        })
+
+    return panel_summary, all_findings, all_errors
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Merge and gate review findings.")
+    parser = argparse.ArgumentParser(description="Merge and gate review findings (JSON in, JSON out).")
     parser.add_argument("spec_name", help="Specification name (directory name under docs/specs/)")
     parser.add_argument("iteration", help="Iteration number or tag (e.g. 1, iteration-1)")
     parser.add_argument("--previous", help="Previous iteration number or tag to detect stagnation (e.g. 1, iteration-1). Defaults to <iteration - 1> from iteration 2 onward.")
@@ -307,40 +281,12 @@ def main():
         sys.stderr.write(f"ERROR: Findings directory not found: {iter_dir}\n")
         sys.exit(1)
 
-    finding_files = sorted(list(iter_dir.glob("*.md")))
+    finding_files = [p for p in iter_dir.glob("*.json") if p.name not in EXCLUDED_FILES]
     if not finding_files:
-        sys.stderr.write(f"ERROR: No findings markdown files found in {iter_dir}\n")
+        sys.stderr.write(f"ERROR: No reviewer JSON files found in {iter_dir}\n")
         sys.exit(1)
 
-    all_errors = {}
-    all_findings = []
-    panel_summary = []
-    seen_ids = set()
-
-    for fpath in finding_files:
-        meta, findings, v_counts, remarks, errors = parse_findings_file(fpath)
-        reviewer = meta.get("reviewer", fpath.stem)
-        
-        # Check ID uniqueness across panel
-        for f in findings:
-            fid = f["id"]
-            if fid in seen_ids:
-                errors.append(f"Duplicate finding ID '{fid}' across review files")
-            else:
-                seen_ids.add(fid)
-
-        if errors:
-            all_errors[fpath.name] = errors
-
-        all_findings.extend(findings)
-        panel_summary.append({
-            "reviewer": reviewer,
-            "file": fpath.name,
-            "blockers": v_counts["blockers"],
-            "majors": v_counts["majors"],
-            "findings_count": len(findings),
-            "remarks": remarks
-        })
+    panel_summary, all_findings, all_errors = load_iteration_findings(iter_dir)
 
     if all_errors:
         sys.stderr.write("VALIDATION FAILED:\n")
@@ -354,108 +300,66 @@ def main():
     merged_findings, discarded = deduplicate_findings(all_findings)
 
     # Compute verdict
-    total_blockers = sum(1 for f in merged_findings if f["severity"] == "BLOCKER")
-    total_majors = sum(1 for f in merged_findings if f["severity"] == "MAJOR")
-    total_minors = sum(1 for f in merged_findings if f["severity"] == "MINOR")
-    total_infos = sum(1 for f in merged_findings if f["severity"] == "INFO")
-
-    verdict = "APPROVED" if (total_blockers == 0 and total_majors == 0) else "CHANGES_REQUIRED"
+    counts = {sev: sum(1 for f in merged_findings if f["severity"] == sev) for sev in ["BLOCKER", "MAJOR", "MINOR", "INFO"]}
+    verdict = "APPROVED" if (counts["BLOCKER"] == 0 and counts["MAJOR"] == 0) else "CHANGES_REQUIRED"
 
     # Action items grouped
     executor_actions = [f for f in merged_findings if f["action_for"] == "executor"]
     testgen_actions = [f for f in merged_findings if f["action_for"] == "test-generator"]
 
-    # Check stagnation. From iteration 2 onward, always compare against the
-    # previous iteration (--previous defaults to iteration - 1).
+    # Stagnation. From iteration 2 onward, always compare against the previous
+    # iteration (--previous defaults to iteration - 1).
     prev_tag = args.previous
     if prev_tag is None and iter_num >= 2:
         prev_tag = str(iter_num - 1)
 
-    stagnant_findings = []
+    stagnation = None
     if prev_tag:
         prev_iter_num = parse_iteration_number(prev_tag)
         prev_iter_dir = spec_dir / "reviews" / f"iteration-{prev_iter_num}"
         if prev_iter_dir.is_dir():
-            prev_all_findings = []
-            for pf in sorted(list(prev_iter_dir.glob("*.md"))):
-                _, p_finds, _, _, p_errs = parse_findings_file(pf)
-                if not p_errs:
-                    prev_all_findings.extend(p_finds)
-            prev_merged, _ = deduplicate_findings(prev_all_findings)
-            stagnant_findings = check_stagnation(merged_findings, prev_merged)
+            _, prev_all_findings, prev_errors = load_iteration_findings(prev_iter_dir)
+            if not prev_errors:
+                prev_merged, _ = deduplicate_findings(prev_all_findings)
+                stagnant = check_stagnation(merged_findings, prev_merged)
+                stagnation = {
+                    "previous_iteration": prev_iter_num,
+                    "repeating_count": len(stagnant),
+                    "repeating": stagnant,
+                }
+            else:
+                sys.stderr.write(f"WARNING: previous iteration findings failed validation, stagnation skipped: {prev_iter_dir}\n")
         else:
             sys.stderr.write(f"WARNING: Stagnation analysis skipped: previous iteration directory not found: {prev_iter_dir}\n")
 
-    # Output formatting to stdout
-    print(f"# Review Merge Report - {args.spec_name}")
-    print(f"Iteration: {iter_num}")
-    print(f"Status: {verdict}")
-    print(f"Blockers: {total_blockers} | Majors: {total_majors} | Minors: {total_minors} | Info: {total_infos}\n")
+    report = {
+        "spec": args.spec_name,
+        "iteration": iter_num,
+        "status": verdict,
+        "counts": counts,
+        "panel": [
+            {
+                "reviewer": p["reviewer"],
+                "file": p["file"],
+                "summary": p["summary"],
+                "blockers": p["blockers"],
+                "majors": p["majors"],
+                "status": "APPROVED" if (p["blockers"] == 0 and p["majors"] == 0) else "CHANGES_REQUIRED",
+                "findings": p["findings"],
+            }
+            for p in panel_summary
+        ],
+        "findings": merged_findings,
+        "deduplicated": discarded,
+        "stagnation": stagnation,
+        "unresolved_minors": [f for f in merged_findings if f["severity"] == "MINOR"],
+        "action_items": {
+            "executor": executor_actions,
+            "test_generator": testgen_actions,
+        },
+    }
 
-    print("## Panel Summary")
-    for p in panel_summary:
-        rev_verdict = "APPROVED" if (p["blockers"] == 0 and p["majors"] == 0) else "CHANGES_REQUIRED"
-        print(f"- **{p['reviewer']}** (`{p['file']}`): {p['blockers']} blockers, {p['majors']} majors | Status: {rev_verdict}")
-        if p["remarks"]:
-            print(f"  Remarks: {p['remarks']}")
-    print()
-
-    print("## Consolidated Findings")
-    if not merged_findings:
-        print("| ID | Severity | File | Line | Category | Description | Action for | Suggested action |")
-        print("|---|---|---|---|---|---|---|---|")
-        print("| – | – | – | – | – | No findings across review panel | none | – |")
-    else:
-        print("| ID | Severity | File | Line | Category | Description | Action for | Suggested action |")
-        print("|---|---|---|---|---|---|---|---|")
-        for f in merged_findings:
-            print(f"| {f['id']} | {f['severity']} | {f['file']} | {f['line']} | {f['category']} | {f['description']} | {f['action_for']} | {f['suggested_action']} |")
-    print()
-
-    if discarded:
-        print("## Deduplicated Items")
-        for d, reason in discarded:
-            print(f"- Finding {d['id']} ({d['severity']}) on `{d['file']}:{d['line']}` ({d['category']}): {reason}")
-        print()
-
-    if prev_tag:
-        print("## Stagnation Report")
-        if stagnant_findings:
-            print(f"WARNING: {len(stagnant_findings)} repeating findings detected across iteration {prev_tag} and {iter_num}:")
-            for curr_f, prev_f in stagnant_findings:
-                print(f"- Repeating {curr_f['severity']} [{curr_f['category']}] on `{curr_f['file']}:{curr_f['line']}` (Current ID: {curr_f['id']}, Prev ID: {prev_f['id']})")
-        else:
-            print("No stagnant findings detected from previous iteration.")
-        print()
-
-    print("## Unresolved MINORs")
-    minor_findings = [f for f in merged_findings if f["severity"] == "MINOR"]
-    if minor_findings:
-        print("MINOR findings do not block approval and must be recorded here so they remain visible across iterations:")
-        for f in minor_findings:
-            print(f"- {f['id']}: `{f['file']}:{f['line']}` ({f['category']}) - {f['description']}")
-    else:
-        print("- No unresolved MINOR findings.")
-    print()
-
-    print("## Action Items & Next Steps")
-    print("### Executor Tasks")
-    if executor_actions:
-        for f in executor_actions:
-            print(f"- [{f['id']} - {f['severity']}] `{f['file']}:{f['line']}`: {f['description']} -> Action: {f['suggested_action']}")
-    else:
-        print("- No pending action items for Executor.")
-    print()
-
-    print("### Test-Generator Tasks")
-    if testgen_actions:
-        for f in testgen_actions:
-            print(f"- [{f['id']} - {f['severity']}] `{f['file']}:{f['line']}`: {f['description']} -> Action: {f['suggested_action']}")
-    else:
-        print("- No pending action items for Test-Generator.")
-    print()
-
-    print(f"## Status: {verdict}")
+    print(json.dumps(report, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
