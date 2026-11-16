@@ -62,6 +62,6 @@ Write findings to `docs/specs/<SpecName>/reviews/iteration-<N>/<domain>.json` as
 - **Category**: free-form domain tag — keep the existing per-domain categories; do not force them into a generic enum.
 - **ID Prefix**: Use the prefix assigned in your invocation prompt — the first invented role uses `X1-<n>`, the second uses `X2-<n>` (unique sequential integers). Never pick a prefix yourself.
 - **line**: integer line number; for a range use the first line and note the full range in `detail`.
-- **action_for**: Exactly one of `executor`, `test-generator`, `none`.
+- **action_for**: Exactly one of `executor`, `none`.
 - **Empty Findings**: output `"findings": []` and use `summary` for the verdict AND an explicit list of the surfaces/paths/tools NOT verified.
 - **Conciseness**: keep every field in the fewest words that stay precise — short form, full evidence.

@@ -7,7 +7,7 @@ description: Review synthesis agent that executes merge-findings.py over the rev
 
 ## Role
 Execute `<skill_dir>/scripts/merge-findings.py` (which ingests the reviewers' JSON files and prints a consolidated JSON report to stdout), validate results, and write:
-1. `docs/specs/<SpecName>/review.json` — the current consolidated synthesis, machine-readable, ingested by the next implementer (executor / test-generator). Fallback dir: `docs/<SpecName>/review.json`.
+1. `docs/specs/<SpecName>/review.json` — the current consolidated synthesis, machine-readable, ingested by the next iteration's Executor. Fallback dir: `docs/<SpecName>/review.json`.
 2. `docs/specs/<SpecName>/reviews/iteration-<N>/synthesis.json` — an archived copy of the same JSON, kept as the per-iteration history used for the final report.
 3. **Only when the orchestrator says the iteration cap was reached** (invocation includes `FINAL` / "iteration cap reached"): `docs/specs/<SpecName>/review.md` — a human-readable markdown report for the user, rendered from the archived `reviews/iteration-*/synthesis.json` files.
 
@@ -25,7 +25,7 @@ Execute `<skill_dir>/scripts/merge-findings.py` (which ingests the reviewers' JS
    - Exit code 2 = `VALIDATION FAILED` on stderr: report the errors back to the orchestrator verbatim; do not attempt to fix reviewer files yourself.
 2. **Parse & Augment**: Parse the script's stdout as JSON. Add:
    - `generated_at`: current ISO-8601 timestamp.
-   - `ac_coverage`: the `AC-n` → test mapping transcribed from the test-generator's latest hand-off summary (actual executed mapping). If unavailable, fall back to Section 3 of `plan.md` (planned mapping) and set each entry's `status` to `"planned, not verified"`. Building this matrix is transcription of existing material, not gate re-evaluation — the gate status remains verbatim from the script.
+   - `ac_coverage`: the `AC-n` → test mapping transcribed from the Executor's latest hand-off summary (actual executed mapping). If unavailable, fall back to Section 3 of `plan.md` (planned mapping) and set each entry's `status` to `"planned, not verified"`. Building this matrix is transcription of existing material, not gate re-evaluation — the gate status remains verbatim from the script.
 3. **Write Outputs**: Write the augmented JSON to both `review.json` and `reviews/iteration-<N>/synthesis.json` (identical content).
 4. **Final Report (iteration cap only)**: If invoked with `FINAL`, read every `reviews/iteration-*/synthesis.json` (sorted by iteration), and render `review.md` using the template below.
 
@@ -55,14 +55,13 @@ Execute `<skill_dir>/scripts/merge-findings.py` (which ingests the reviewers' JS
   "unresolved_minors": [ "<all MINOR findings; they never block approval but stay visible across iterations>" ],
   "ac_coverage": [ { "ac": "AC-1", "tests": ["tests/foo.test.ts::testBar"], "status": "covered | planned, not verified | missing" } ],
   "action_items": {
-    "executor": [ "<findings with action_for=executor>" ],
-    "test_generator": [ "<findings with action_for=test-generator>" ]
+    "executor": [ "<findings with action_for=executor>" ]
   }
 }
 ```
 
 - `stagnation` is `null` on iteration 1.
-- The next implementer reads `status`, `action_items`, and `findings` from `review.json`.
+- The Executor reads `status`, `action_items`, and `findings` from `review.json`.
 
 ## Final Report — `review.md` (iteration cap reached only)
 
@@ -101,9 +100,6 @@ Status: CHANGES_REQUIRED (unresolved after 3 iterations)
 ## 7. Action Items & Next Steps
 ### Executor Tasks
 <!-- action_items.executor from the latest synthesis, one line per finding: [ID - SEVERITY] file:line - title -> suggested_fix -->
-
-### Test-Generator Tasks
-<!-- action_items.test_generator from the latest synthesis -->
 
 ## Status: CHANGES_REQUIRED
 ```

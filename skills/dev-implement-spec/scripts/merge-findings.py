@@ -22,7 +22,7 @@ from pathlib import Path
 
 VALID_SEVERITIES = {"BLOCKER", "MAJOR", "MINOR", "INFO"}
 SEVERITY_ORDER = {"BLOCKER": 4, "MAJOR": 3, "MINOR": 2, "INFO": 1}
-VALID_ACTIONS = {"executor", "test-generator", "none"}
+VALID_ACTIONS = {"executor", "none"}
 REQUIRED_FINDING_FIELDS = ["id", "severity", "file", "line", "category", "title", "detail", "suggested_fix", "action_for"]
 DOMAIN_PREFIX_MAP = {
     "correctness": "C",
@@ -305,7 +305,6 @@ def main():
 
     # Action items grouped
     executor_actions = [f for f in merged_findings if f["action_for"] == "executor"]
-    testgen_actions = [f for f in merged_findings if f["action_for"] == "test-generator"]
 
     # Stagnation. From iteration 2 onward, always compare against the previous
     # iteration (--previous defaults to iteration - 1).
@@ -355,7 +354,6 @@ def main():
         "unresolved_minors": [f for f in merged_findings if f["severity"] == "MINOR"],
         "action_items": {
             "executor": executor_actions,
-            "test_generator": testgen_actions,
         },
     }
 

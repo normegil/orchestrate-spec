@@ -102,4 +102,4 @@ graph TD
    - If `plan.md` is modified after Phase 3 started or completed: re-run Phase 3.
    - When a phase re-runs, explicitly inform the user which downstream artifacts were invalidated.
 3. **Immutable Identifier**: `<SpecName>` established in Phase 1 remains consistent across all phases and directory paths.
-4. **Role Separation**: Analyst/Planner do not write code; Reviewers/Synthesizer are read-only on project code; Executor/Test-Generator adhere to the plan and AC criteria.
+4. **Role Separation**: Analyst/Planner do not write code; Reviewers/Synthesizer are read-only on project code; the Executor adheres to the plan and AC criteria.

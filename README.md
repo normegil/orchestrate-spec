@@ -32,7 +32,7 @@ Each phase can also run standalone — see [The skills](#the-skills).
 
 1. **Requirements Grilling (`dev-analyze`)**: Models requirements as a design tree and asks batched question rounds with recommended answers while discovering repository facts read-only. Grilling ends when the decision frontier is empty.
 2. **Implementation Planning (`dev-plan-spec-implementation`)**: Researches codebase context read-only, generates fine-grained tasks, and maps all acceptance criteria (`AC-n`) to tests.
-3. **Implementation Loop (`dev-implement-spec`)**: Automated loop coordinating executor, test-generator, and parallel reviewer panel with deterministic gating. Runs at most 5 iterations; tracks stagnation across cycles and escalates only after iteration 5.
+3. **Implementation Loop (`dev-implement-spec`)**: Automated loop coordinating the executor and a parallel reviewer panel with deterministic gating. Runs at most 5 iterations; tracks stagnation across cycles and escalates only after iteration 5.
 4. **Documentation (`dev-document-spec`)**: Enriches in-code documentation and project reference guides.
 
 ### Validation Gates & Invalidation
@@ -59,7 +59,7 @@ docs/specs/<SpecName>/
 | `dev-orchestrate-spec` | Orchestrates lifecycle end-to-end (intake, resume, invalidation) | — |
 | `dev-analyze` | Interactive grilling rounds over design tree; records spec | `docs/specs/<SpecName>/spec.md` |
 | `dev-plan-spec-implementation` | Read-only codebase research, AC test mapping, and plan review | `docs/specs/<SpecName>/plan.md` |
-| `dev-implement-spec` | Iterative executor/test-gen/reviewer loop with deterministic gate | Code, tests, reviews, `review.md` |
+| `dev-implement-spec` | Iterative executor/reviewer loop with deterministic gate | Code, tests, reviews, `review.md` |
 | `dev-document-spec` | Post-approval in-code and system documentation | In-code docs, `README.md`, `docs/` |
 
 ### Standalone Invocations
@@ -75,7 +75,7 @@ If `<SpecName>` is omitted, the skill scans `docs/specs/` and proposes matching 
 
 ## Guardrails
 
-- **Role separation**: Analyst and planner do not modify code; reviewers operate strictly read-only; executor and test-generator adhere strictly to `spec.md` and `plan.md`.
+- **Role separation**: Analyst and planner do not modify code; reviewers operate strictly read-only; the executor adheres strictly to `spec.md` and `plan.md`.
 - **Explicit validation**: No `spec.md` or `plan.md` is saved without human approval.
 - **Bounded execution**: Implementation loop caps at 5 iterations before human escalation.
 

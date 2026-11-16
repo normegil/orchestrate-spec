@@ -68,6 +68,6 @@ Write findings to `docs/specs/<SpecName>/reviews/iteration-<N>/quality.json` as 
 - **Category**: free-form domain tag (e.g. `logging`) — keep the existing per-domain categories; do not force them into a generic enum.
 - **ID Prefix**: Use `Q<n>` (e.g., `Q1`, `Q2`).
 - **line**: integer line number; for a range use the first line and note the full range in `detail`.
-- **action_for**: Exactly one of `executor`, `test-generator`, `none`.
+- **action_for**: Exactly one of `executor`, `none`.
 - **Empty Findings**: output `"findings": []` and use `summary` for the verdict AND an explicit list of the surfaces/paths/tools NOT verified.
 - **Conciseness**: keep every field in the fewest words that stay precise — short form, full evidence.

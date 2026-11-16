@@ -1,16 +1,15 @@
 ---
 name: dev-implement-spec
-description: Orchestrates the iterative implementation loop across Executor, Test-Generator, and a parallel Reviewer Panel with deterministic gating until approved.
+description: Orchestrates the iterative implementation loop across Executor and a parallel Reviewer Panel with deterministic gating until approved.
 ---
 
 # Specification Implementation Orchestrator – dev-implement-spec
 
 ## Role
 Coordinate and iteratively invoke specialized sub-agents:
-1. **Executor** (`<skill_dir>/agents/executor.md`): Implements code changes, ensures clean compilation, and runs tests.
-2. **Test-Generator** (`<skill_dir>/agents/test-generator.md`): Generates unit and integration tests strictly mapped to `spec.md` acceptance criteria (`AC-n`) and `plan.md`.
-3. **Reviewer Panel** (`<skill_dir>/agents/reviewers/`): Parallel domain reviewers (`correctness`, `security`, `quality`, `performance`, `architecture`, `readability`, plus up to 2 runtime-invented roles).
-4. **Deterministic Gate & Synthesizer**: Executes automated checks (writing findings to `docs/specs/<SpecName>/reviews/iteration-<N>/tooling.json`), then delegates merge and synthesis to **Review-Synthesizer** (`<skill_dir>/agents/review-synthesizer.md`), which executes `<skill_dir>/scripts/merge-findings.py` over the reviewers' JSON files and writes the consolidated `docs/specs/<SpecName>/review.json` (machine-readable, ingested by the next implementer) plus a per-iteration archive `reviews/iteration-<N>/synthesis.json`. At the iteration cap, the synthesizer additionally renders the final human-readable `docs/specs/<SpecName>/review.md`. The orchestrator never runs the merge script itself.
+1. **Executor** (`<skill_dir>/agents/executor.md`): Implements code changes, generates/audits unit and integration tests strictly mapped to `spec.md` acceptance criteria (`AC-n`) and `plan.md`, ensures clean compilation, and runs tests.
+2. **Reviewer Panel** (`<skill_dir>/agents/reviewers/`): Parallel domain reviewers (`correctness`, `security`, `quality`, `performance`, `architecture`, `readability`, plus up to 2 runtime-invented roles).
+3. **Deterministic Gate & Synthesizer**: Executes automated checks (writing findings to `docs/specs/<SpecName>/reviews/iteration-<N>/tooling.json`), then delegates merge and synthesis to **Review-Synthesizer** (`<skill_dir>/agents/review-synthesizer.md`), which executes `<skill_dir>/scripts/merge-findings.py` over the reviewers' JSON files and writes the consolidated `docs/specs/<SpecName>/review.json` (machine-readable, ingested by the next iteration's Executor) plus a per-iteration archive `reviews/iteration-<N>/synthesis.json`. At the iteration cap, the synthesizer additionally renders the final human-readable `docs/specs/<SpecName>/review.md`. The orchestrator never runs the merge script itself.
 
 *Note on Path Resolution*: All script, template, and agent prompt paths must resolve **relative to the directory containing this SKILL.md** (`<skill_dir>`), not the project root.
 
@@ -27,25 +26,22 @@ Coordinate and iteratively invoke specialized sub-agents:
 Initialize `iteration = 1` (maximum iterations = 3).
 
 #### Iteration Cycle:
-1. **Step A: Code Implementation (Prompt: `<skill_dir>/agents/executor.md`)**
+1. **Step A: Implementation & Test Generation (Prompt: `<skill_dir>/agents/executor.md`)**
    - Iteration 1: Implement Section 2 of `plan.md` (fan out to bounded sub-implementers for file-disjoint tasks).
    - Subsequent Iterations: Implement `action_items.executor` from `review.json`.
-   - Ensure all changes compile and pass existing test suites.
+   - Create/adapt unit, integration, and cross-module tests covering Section 3 of `plan.md` and all `spec.md` acceptance criteria (`AC-n`, falling back to prose requirements if unnumbered); audit sub-implementer unit tests.
+   - Ensure all changes compile and all tests pass.
 
-2. **Step B: Test Generation & Traceability (Prompt: `<skill_dir>/agents/test-generator.md`)**
-   - Create/adapt unit and integration tests covering Section 3 of `plan.md` and all `spec.md` acceptance criteria (`AC-n`, falling back to prose requirements if unnumbered).
-   - Ensure tests compile and pass against implemented code.
-
-3. **Step C: Validation & Quality Review**
-   - **C1 — Panel Selection**: Default panel of six fixed reviewers. Skip a domain only if diff provably touches none of its trigger surface (record 1-line justification). Invent at most 2 roles (`_template.md`) if needed. Assign invented-role prefixes deterministically: the first invented role uses `X1-<n>`, the second uses `X2-<n>`. State the assigned prefix explicitly in each invented reviewer's prompt.
-   - **C2 — Deterministic Checks**: Run build, tests, and linters discovered from repository config. Severity: build/test failure = `BLOCKER`, linter error = `MAJOR`, warning = `MINOR`. Write automated-check findings to `docs/specs/<SpecName>/reviews/iteration-<N>/tooling.json` using the JSON findings format (reviewer: `tooling`, prefix `T<n>`).
-   - **C3 — Parallel Fan-Out**: Spawn selected reviewers concurrently, passing `tooling.json` to reviewers. Reviewers check changes against `plan.md` and `AC-n` criteria, writing findings as JSON to `docs/specs/<SpecName>/reviews/iteration-<N>/<domain>.json`.
-   - **C4 — Merge & Synthesis**:
+2. **Step B: Validation & Quality Review**
+   - **B1 — Panel Selection**: Default panel of six fixed reviewers. Skip a domain only if diff provably touches none of its trigger surface (record 1-line justification). Invent at most 2 roles (`_template.md`) if needed. Assign invented-role prefixes deterministically: the first invented role uses `X1-<n>`, the second uses `X2-<n>`. State the assigned prefix explicitly in each invented reviewer's prompt.
+   - **B2 — Deterministic Checks**: Run build, tests, and linters discovered from repository config. Severity: build/test failure = `BLOCKER`, linter error = `MAJOR`, warning = `MINOR`. Write automated-check findings to `docs/specs/<SpecName>/reviews/iteration-<N>/tooling.json` using the JSON findings format (reviewer: `tooling`, prefix `T<n>`).
+   - **B3 — Parallel Fan-Out**: Spawn selected reviewers concurrently, passing `tooling.json` to reviewers. Reviewers check changes against `plan.md` and `AC-n` criteria, writing findings as JSON to `docs/specs/<SpecName>/reviews/iteration-<N>/<domain>.json`.
+   - **B4 — Merge & Synthesis**:
      - Delegate to `review-synthesizer` (`<skill_dir>/agents/review-synthesizer.md`), the sole owner of `merge-findings.py` execution: it runs the script over the reviewers' JSON files and writes `docs/specs/<SpecName>/review.json` (status, merged findings, unresolved MINORs, action items, AC coverage matrix `AC-n` → tests) plus the archive `reviews/iteration-<N>/synthesis.json`. The orchestrator must not run the script or merge findings itself.
      - From iteration 2 onward, instruct the synthesizer to pass `--previous <iteration - 1>` so stagnation analysis is never skipped (iteration 1 has no previous iteration).
      - If the script aborts with `VALIDATION FAILED` (e.g. duplicate finding IDs across invented reviewers), recovery is deterministic: instruct the offending reviewer to renumber its findings using its assigned prefix, then have the synthesizer re-run the script.
 
-4. **Step D: Evaluation & Routing**
+3. **Step C: Evaluation & Routing**
    - Check `status: [APPROVED | CHANGES_REQUIRED]` in `review.json`.
    - **If `APPROVED`**: Conclude loop and deliver final summary.
    - **If `CHANGES_REQUIRED`**:
