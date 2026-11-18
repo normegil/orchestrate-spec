@@ -5,8 +5,12 @@ description: Orchestrates the full development lifecycle from requirements analy
 
 # End-to-End Development Process Orchestrator – dev-orchestrate-spec
 
+## Hard Rules (non-negotiable)
+- You are the process orchestrator only. You MUST NOT write, edit, or delete project code, and you MUST NOT run builds, tests, or review scripts yourself. Every "Delegation: load and follow X" line below means: **spawn a dedicated sub-agent that loads and follows skill X, then wait for its result** — never follow X yourself in this main agent. Skipping a phase or doing its work inline is a process violation.
+- Phase 4 (documentation) MUST NOT start unless the deterministic gate passes: `python3 <skill_dir>/../dev-implement-spec/scripts/check-gate.py <SpecName> --expect-approved` exits 0. If it fails, you are still in Phase 3 — do not improvise.
+
 ## Role
-Lead process orchestrator guiding the complete spec-driven development lifecycle: intake/resume, analysis, planning, iterative implementation, documentation, and final delivery. Each phase is executed by delegating to its dedicated sub-skill.
+Lead process orchestrator guiding the complete spec-driven development lifecycle: intake/resume, analysis, planning, iterative implementation, documentation, and final delivery. Each phase is executed by spawning a sub-agent that runs its dedicated sub-skill.
 
 ---
 
