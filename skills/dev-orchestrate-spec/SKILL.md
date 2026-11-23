@@ -54,7 +54,7 @@ graph TD
 ### Phase 1: Requirements Analysis
 - **Objective**: Convert task requirements into a structured specification via grilling rounds over a design tree.
 - **Inputs**: User task description or requirements file.
-- **Delegation**: `load and follow <skill_dir>/../dev-analyze/SKILL.md`.
+- **Delegation**: `load and follow <skill_dir>/../dev-analyze/SKILL.md`. DO NOT use a subagent for this skill, run it as part of the main agent.
 - **Outputs & Quality Gate**:
   - Frontier is empty; user explicitly validates `<SpecName>` (`<yyyy-MM-dd-HH-mm>-<Bug|Feature>-<ResumeIn2Or3Words>`) and draft specification.
   - `docs/specs/<SpecName>/spec.md` written and populated.
@@ -63,7 +63,7 @@ graph TD
 ### Phase 2: Implementation Planning
 - **Objective**: Translate specification into fine-grained, actionable implementation steps with acceptance-criteria test mapping.
 - **Inputs**: Locked `<SpecName>` and `docs/specs/<SpecName>/spec.md`.
-- **Delegation**: `load and follow <skill_dir>/../dev-plan-spec-implementation/SKILL.md`.
+- **Delegation**: `load and follow <skill_dir>/../dev-plan-spec-implementation/SKILL.md`. DO NOT use a subagent for this skill, run it as part of the main agent.
 - **Outputs & Quality Gate**:
   - User explicitly validates the draft plan.
   - `docs/specs/<SpecName>/plan.md` written and populated.
@@ -71,14 +71,14 @@ graph TD
 ### Phase 3: Implementation & Review Loop
 - **Objective**: Iteratively implement, test, and review changes until reaching approval.
 - **Inputs**: Locked `<SpecName>`, `spec.md`, and `plan.md`.
-- **Delegation**: `load and follow <skill_dir>/../dev-implement-spec/SKILL.md`.
+- **Delegation**: `load and follow <skill_dir>/../dev-implement-spec/SKILL.md`. DO NOT use a subagent for this skill, run it as part of the main agent. All needed subagents are defined by the skill, and the skill will detect when to spawn them.
 - **Outputs & Quality Gate**:
   - Build succeeds, tests pass, and `docs/specs/<SpecName>/review.md` confirms `Status: APPROVED`.
 
 ### Phase 4: Post-Implementation Documentation
 - **Objective**: Enrich in-code documentation and update repository/system documentation.
 - **Inputs**: Locked `<SpecName>`, `spec.md`, `plan.md`, and `review.md`.
-- **Delegation**: `load and follow <skill_dir>/../dev-document-spec/SKILL.md`.
+- **Delegation**: `load and follow <skill_dir>/../dev-document-spec/SKILL.md`. You may run a subagent for this task with the skill loaded, but you can also use the main agent for this.
 - **Outputs & Quality Gate**:
   - In-code and `docs/` updates present in working tree; project builds cleanly.
 
