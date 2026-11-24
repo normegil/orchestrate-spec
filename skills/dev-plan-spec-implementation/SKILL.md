@@ -26,6 +26,7 @@ Investigate codebase using read tools (`open`, `grep_search`, `glob_search`):
 1. **Impacted Components**: Identify controllers, services, repositories/DAOs, models, DTOs, and dependency injection configs to be modified or referenced.
 2. **Conventions & Documentation**: Review project coding guidelines, database conventions, and config handling in `docs/`.
 3. **Testing Strategy**: Identify test frameworks, naming conventions, directory structure, and existing test suites for impacted areas.
+4. **Parallelization Analysis**: Actively identify which proposed modifications touch disjoint files/symbols with no dependency between them, so they can be executed in parallel by separate agents.
 
 ### 3. Implementation Plan Drafting
 Decompose work following the standard plan structure. Write it dense: each Section 2 step states only the file, symbol, and change; Sections 1 and 4 are terse bullets, not paragraphs.
@@ -45,6 +46,9 @@ Fine-grained, numbered steps (2.1, 2.2, etc.). For each step, specify:
 - Target methods, signatures, parameters, and return types.
 - Business logic, error handling, and transformations.
 - Dependency injection or configuration updates.
+
+### 2.x. Parallelization
+- Group steps that can be performed in parallel (disjoint files/symbols, no ordering dependency), with one group per parallel track.
 
 ## 3. Verification Plan
 *Coverage Rule: Every acceptance criterion (`AC-n`) from `spec.md` must be covered by at least one named unit or integration test. Any criterion intentionally left untested must be listed with explicit justification. If the spec lacks numbered ACs, map prose requirements.*
